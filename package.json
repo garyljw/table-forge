@@ -1,0 +1,33 @@
+{
+  "name": "table-forge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Self-hosted D&D 5e (2014) companion for an in-person table",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10.34.9 <11"
+  },
+  "scripts": {
+    "prepare": "node scripts/setup-hooks.mjs",
+    "dev": "pnpm -r --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm --filter @table-forge/web build && pnpm --filter @table-forge/worker build",
+    "preview": "pnpm build && pnpm --filter @table-forge/worker preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "test": "pnpm -r test",
+    "check:canary": "node scripts/check-client-bundle.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "^22.19.0",
+    "eslint": "10.15.0",
+    "eslint-import-resolver-typescript": "^4.4.0",
+    "eslint-plugin-boundaries": "7.4.4",
+    "globals": "17.14.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0"
+  }
+}

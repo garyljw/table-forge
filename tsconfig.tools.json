@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "outDir": "./node_modules/.cache/tsc-tools",
+    "tsBuildInfoFile": "./node_modules/.cache/tsc-tools/tsbuildinfo"
+  },
+  "include": ["apps/*/vite.config.ts", "apps/*/vitest.config.ts", "packages/*/vitest.config.ts"]
+}
