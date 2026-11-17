@@ -53,6 +53,7 @@ Any change touching these needs Sonnet and a `/security-review`:
 ### Git, PRs and deploys
 - **Never open a pull request without the owner's explicit instruction.** Finishing a feature is not an instruction. Wait to be told.
 - Work on feature branches, never directly on `main`.
+  - **Exception:** plan and documentation edits (this file, `README.md`, plans) may be committed straight to `main`. Anything touching code, config, CI or the separation fences still needs a branch.
 - Don't push to GitHub or deploy to production Cloudflare without explicit instruction either. Local `wrangler dev` runs are fine at any time.
 
 ### CI and deployment
@@ -198,13 +199,45 @@ Changes to these fences (pnpm, tsconfig or lint configuration, the canary check,
 ### Map features
 - Upload a map image, then set the grid size and offset.
 - Tokens for PCs and monsters. Monster tokens can be linked to a stat block (visible to the DM only).
-- **Fog of war**: the DM manually reveals or hides areas with a brush or shapes. Line of sight from walls is backlog.
+- **Fog of war**: the DM manually reveals or hides areas with a brush or shapes. Line of sight from walls comes in Phase 8.
 - **Ruler and movement**:
   - Distances in **feet**, on a 5 ft grid.
   - The diagonal rule is a campaign setting: PHB (every square 5 ft) or DMG variant (5/10/5).
   - A player's drag path and distance show on every screen, e.g. "25 / 30 ft".
   - The move applies straight away, and the DM can undo it.
 - Outside a live session, players see characters and rules but no maps.
+
+### Lighting and effects
+- **Light sources** are map objects with:
+  - bright and dim radii in feet (torch 20/40, lantern 30/60, *Light* 20/40, *Daylight* 60/120)
+  - colour and flicker style
+  - an anchor: attached to a token, or placed on the map
+  - on/off and hidden flags
+- Every lighting change is an event, so the DM can undo it. Examples: knocking over a brazier, dropping a torch, short-lived spell effects such as a *Fireball* flash or *Faerie Fire*.
+- **Vision rules:** the map has an ambient light level (bright, dim or dark). Darkvision is per character. Magical darkness cancels normal light.
+- **Rendering:** a darkness overlay with soft coloured light cut-outs. Flicker is animated on each device, with no network traffic.
+- **Stage A, atmosphere only (Phase 4b):** lighting is visual only. The DM's manual fog and hidden tokens still decide what players receive.
+- **Stage B, lighting decides visibility (Phase 8):**
+  - Walls and doors block light and sight.
+  - The server computes what each character can see, and sends only that.
+  - The TV shows the party's combined view. Each phone shows that character's own view.
+  - This is part of the visibility filter, so it is a **high-security area**.
+  - The geometry lives in `packages/core`, with thorough tests.
+  - Use `polyclip-ts` (MIT) for polygon union and intersection. Write the visibility-polygon algorithm ourselves, so the security-critical code is fully owned and tested.
+
+### Scene editor and map generation
+- **Walls, doors and lights are data layered over the map image. They are never painted into it.** That is what lets a light be knocked over or a door opened.
+- **Scene editor (Phase 8):**
+  - Wall and door tools that snap to the grid, with click-to-place polylines.
+  - Light presets: torch, brazier, candle, hearth, magical glow. Each can be on/off and hidden.
+  - A live lighting preview while editing.
+  - Import and export of **Universal VTT (`.dd2vtt`)**, the format Dungeondraft, Dungeon Alchemist and DungeonFog export.
+  - An importer for **Watabou's One Page Dungeon** JSON, for free generated dungeons with walls already defined.
+- **Procedural generator (Phase 9):**
+  - Generates rooms, corridors and caves, producing walls, doors and lights natively and rendering the floor from tiles.
+  - An optional text description ("ruined chapel, crypt below") can be turned into a room layout.
+  - **Tile art must be licensed for our use.** Assets that cannot be redistributed live in R2, never in the public repo.
+- **AI help at prep time:** the owner asks Claude in a coding session to produce scene data, in the same way as book transcription. AI tracing of walls from a PNG is only a rough draft and needs correcting by hand.
 
 ### Character sheets
 - **Phase 1: a sheet that does the maths.**
@@ -221,13 +254,16 @@ Changes to these fences (pnpm, tsconfig or lint configuration, the canary check,
 2. **Map basics**: upload, grid, tokens, ruler, in a single view.
 3. **Live sync**: DM and Display roles, Durable Object session, event log and undo.
 4. **Fog of war and hidden tokens**, with server-side filtering and tests.
+   - **4b. Lighting and effects, stage A**: lights on tokens and on the map, a darkness overlay, flicker, spell effects. Atmosphere only.
 5. **Character sheets**: the sheet that does the maths, then level-up and drafts.
 6. **Players**: Access logins, player phone view, moving own tokens.
 7. **Combat**: initiative, turn tracking, movement remaining, monster stat blocks on tokens.
+8. **Walls, line of sight and dynamic lighting (stage B)**: the scene editor (walls, doors, lights), `.dd2vtt` import/export, the Watabou importer, and server-computed vision for each character. Requires `/security-review`.
+9. **Procedural map generator**: rooms, corridors and caves, with walls, doors and lights generated natively.
 
 **Blocking before real or private data:** Access on preview URLs; a staging D1 database and R2 bucket for previews. See "CI and deployment".
 
-**Backlog:** dice roller, DM pings on the TV, line of sight and walls, sound effects, session notes, scheduled D1 to R2 backups (do this before real campaign data exists), custom domain.
+**Backlog:** dice roller, DM pings on the TV, sound effects, session notes, an in-app "describe a dungeon" AI button (needs a Claude API key as a secret, so it is a high-security area, and it sends map descriptions to an outside service), scheduled D1 to R2 backups (do this before real campaign data exists), custom domain.
 
 ## Testing
 - Unit tests (Vitest) for the game-logic package. Visibility filtering, the ruler and diagonal rules, the event log and undo, and the character maths are mandatory.
