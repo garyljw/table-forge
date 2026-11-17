@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit secret scan. Fails closed: if gitleaks is missing, the commit is blocked.
+# NEVER bypass this hook with --no-verify. If it finds a secret, remove the
+# secret, and if it was ever committed, tell the owner so it can be rotated.
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "ERROR: gitleaks is not installed or not on PATH, so commits are blocked." >&2
+  echo "Install it with:  brew install gitleaks" >&2
+  echo "Then retry the commit. Do not bypass this hook with --no-verify." >&2
+  exit 1
+fi
+
+exec gitleaks git --pre-commit --staged --redact --verbose

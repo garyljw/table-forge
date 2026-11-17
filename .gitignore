@@ -1,0 +1,30 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+.wrangler/
+.vite/
+*.log
+
+# OS and editors
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets (local config; production secrets live in `wrangler secret`)
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+!.env.example
+
+# Private-data guardrails
+# Private book data (scans, transcribed JSON, databases) belongs in the
+# separate private repo table-forge-data, never in this public repo.
+scans/
+private/
+*.db
+*.sqlite
+*.sqlite3
