@@ -53,7 +53,9 @@ Any change touching these needs Sonnet and a `/security-review`:
 ### Git, PRs and deploys
 - **Never open a pull request without the owner's explicit instruction.** Finishing a feature is not an instruction. Wait to be told.
 - Work on feature branches, never directly on `main`.
-  - **Exception:** plan and documentation edits (this file, `README.md`, plans) may be committed straight to `main`. Anything touching code, config, CI or the separation fences still needs a branch.
+  - `main` is protected, so **every change, including documentation, reaches `main` only through a PR** with passing checks. Nobody pushes directly to `main` or bypasses the protection.
+  - **Documentation-only changes** (this file, `README.md`, plans) are lightweight. Use a short-lived `docs/...` branch. The owner's request to make the edit counts as the instruction to push and open the PR, and no `/code-review` or `/security-review` is needed. The owner still merges.
+  - Anything touching code, config, CI or the separation fences follows the full workflow above.
 - Don't push to GitHub or deploy to production Cloudflare without explicit instruction either. Local `wrangler dev` runs are fine at any time.
 
 ### CI and deployment
