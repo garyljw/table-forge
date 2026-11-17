@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Strict workspace (separation fence 1): a package can only import what it
+# declares in its own package.json. Nothing is hoisted, and workspace packages
+# are linked only through explicit "workspace:*" dependencies.
+hoist: false
+shamefullyHoist: false
+linkWorkspacePackages: false
+publicHoistPattern: []

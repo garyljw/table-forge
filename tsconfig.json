@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/core" },
+    { "path": "apps/web" },
+    { "path": "apps/worker" },
+    { "path": "tsconfig.tools.json" }
+  ]
+}
