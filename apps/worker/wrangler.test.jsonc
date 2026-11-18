@@ -2,5 +2,6 @@
   // Used only by vitest: same Worker, without the static-assets binding.
   "name": "table-forge-test",
   "main": "src/index.ts",
-  "compatibility_date": "2026-11-01"
+  "compatibility_date": "2026-11-01",
+  "d1_databases": [{ "binding": "DB", "database_name": "table-forge-test", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }]
 }

@@ -8,5 +8,16 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
+  // Placeholder database id: it works for local dev (`wrangler dev` and the import script
+  // use a local copy keyed on the binding). The planner replaces it with the real D1
+  // database id once the remote database exists.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "table-forge",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
   "observability": { "enabled": true }
 }

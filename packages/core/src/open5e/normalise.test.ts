@@ -1,0 +1,204 @@
+import { Condition, ClassDetail, LicenseText, Monster, SourceDocument, Spell } from "@table-forge/shared";
+import { describe, expect, it } from "vitest";
+import { isDocumentIncluded, OPEN5E_CONTENT_RULES } from "./config.js";
+import { normaliseClass } from "./class.js";
+import { normaliseConditions } from "./condition.js";
+import { normaliseDocument, normaliseLicense } from "./document.js";
+import { foldName } from "../fold.js";
+import * as fx from "./fixtures.js";
+import { normaliseMonster } from "./monster.js";
+import { buildImportStatements, sqlText } from "./sql.js";
+import { normaliseSpell } from "./spell.js";
+
+describe("document filter", () => {
+  const doc = (key: string, gs: string) => ({ key, gamesystem: { key: gs } });
+  it("includes 2014 documents and excludes the 2024 rules and other systems", () => {
+    expect(isDocumentIncluded(doc("srd-2014", "5e-2014"))).toBe(true);
+    expect(isDocumentIncluded(doc("tob", "5e-2014"))).toBe(true);
+    expect(isDocumentIncluded(doc("srd-2024", "5e-2024"))).toBe(false);
+    expect(isDocumentIncluded(doc("a5e-ag", "a5e"))).toBe(false);
+  });
+  it("honours the exclude and include lists", () => {
+    expect(OPEN5E_CONTENT_RULES.excludeDocuments).toContain("elderberry-inn-icons");
+    expect(isDocumentIncluded(doc("elderberry-inn-icons", "5e-2014"))).toBe(false);
+    expect(isDocumentIncluded(doc("x", "other"), { ...OPEN5E_CONTENT_RULES, includeDocuments: ["x"] })).toBe(true);
+  });
+});
+
+describe("normaliseDocument", () => {
+  it("uses the required wording for the SRD", () => {
+    const d = normaliseDocument(fx.srdDocument);
+    expect(SourceDocument.safeParse(d).success).toBe(true);
+    expect(d.attribution).toContain("System Reference Document 5.1");
+    expect(d.attribution).toContain("creativecommons.org/licenses/by/4.0");
+    expect(d.licenses[0]?.url).toBe("https://creativecommons.org/licenses/by/4.0/");
+    expect(d.origin).toBe("open5e");
+    expect(d.visibility).toBe("public");
+  });
+  it("builds an attribution line from metadata for third-party documents", () => {
+    const d = normaliseDocument(fx.koboldDocument);
+    expect(d.attribution).toContain("Tome of Beasts by Chris Harris, Dan Dillon, published by Kobold Press.");
+    expect(d.attribution).toContain("OPEN GAME LICENSE Version 1.0a");
+    expect(d.attribution).toContain("https://koboldpress.com/tome-of-beasts/");
+  });
+});
+
+describe("normaliseSpell", () => {
+  it("maps Fireball", () => {
+    const s = normaliseSpell(fx.fireball);
+    expect(Spell.parse(s)).toEqual(s);
+    expect(s).toMatchObject({
+      id: "srd_fireball",
+      documentKey: "srd-2014",
+      level: 3,
+      school: "evocation",
+      classes: ["sorcerer", "wizard"],
+      castingTime: "action",
+      savingThrow: "dexterity",
+      damageRoll: "8d6",
+      area: { shape: "sphere", sizeFeet: 20 },
+    });
+    expect(s.description.endsWith("successful one.")).toBe(true);
+    expect(s.components.materialDescription).toBe("A tiny ball of bat guano and sulfur.");
+  });
+  it("reads a material cost that Open5e sends as a decimal string", () => {
+    expect(normaliseSpell({ ...fx.fireball, material_cost: "25.00" }).components.materialCostGp).toBe(25);
+    expect(normaliseSpell({ ...fx.fireball, material_cost: 1000 }).components.materialCostGp).toBe(1000);
+    expect(() => normaliseSpell({ ...fx.fireball, material_cost: "lots" })).toThrow(/material cost/);
+  });
+  it("turns empty strings into null and keeps ritual and concentration", () => {
+    const s = normaliseSpell(fx.detectMagic);
+    expect(Spell.safeParse(s).success).toBe(true);
+    expect(s).toMatchObject({ higherLevel: null, damageRoll: null, savingThrow: null, area: null, concentration: true, ritual: true });
+    expect(s.components.materialDescription).toBeNull();
+  });
+});
+
+describe("normaliseMonster", () => {
+  it("maps the Goblin and orders actions by stat block position", () => {
+    const m = normaliseMonster(fx.goblin);
+    expect(Monster.parse(m)).toEqual(m);
+    expect(m).toMatchObject({
+      id: "srd_goblin",
+      size: "small",
+      type: "humanoid",
+      challengeRating: 0.25,
+      armorClass: 15,
+      armorDetail: "leather armor, shield",
+      hitPoints: 7,
+      hitDice: "2d6",
+      skills: { stealth: 6 },
+      senses: { darkvision: 60, passivePerception: 9 },
+    });
+    expect(m.speed).toMatchObject({ walk: 30, fly: null, hover: false, unit: "feet" });
+    expect(m.actions.map((a) => a.name)).toEqual(["Scimitar", "Shortbow"]);
+    expect(m.traits.map((t) => t.name)).toEqual(["Nimble Escape"]);
+  });
+  it("splits action kinds and reads recharge, per-day and legendary cost", () => {
+    const m = normaliseMonster(fx.testWyrm);
+    expect(Monster.safeParse(m).success).toBe(true);
+    expect(m.hitDice).toBe("19d12+133");
+    expect(m.actions[0]).toMatchObject({ name: "Fire Breath", usage: { kind: "recharge", value: 5 } });
+    expect(m.bonusActions[0]).toMatchObject({ name: "Tail Flick", usage: { kind: "perDay", value: 3 } });
+    expect(m.legendaryActions.map((a) => [a.name, a.legendaryCost])).toEqual([["Detect", 1], ["Wing Beat", 2]]);
+    expect(m.reactions.map((a) => a.name)).toEqual(["Parry"]);
+    expect(m.damageResistances).toBe("bludgeoning from nonmagical attacks");
+    expect(m.speed.hover).toBe(true);
+  });
+  it("allows a missing hit dice formula", () => {
+    expect(normaliseMonster(fx.wyrmWithoutHitDice).hitDice).toBeNull();
+  });
+  it("rejects a speed unit that is not feet", () => {
+    expect(() => normaliseMonster({ ...fx.goblin, speed: { unit: "meters", walk: 9 } })).toThrow(/unit/);
+  });
+});
+
+describe("normaliseClass", () => {
+  it("builds features, the level table and the proficiency and equipment blocks", () => {
+    const c = normaliseClass(fx.wizard);
+    expect(ClassDetail.parse(c)).toEqual(c);
+    expect(c.parentClass).toBeNull();
+    expect(c.savingThrows).toEqual(["Intelligence", "Wisdom"]);
+    expect(c.proficiencies).toContain("**Armor:** None\n");
+    expect(c.startingEquipment).toBe("A quarterstaff or a dagger");
+    expect(c.features.map((f) => [f.name, f.levels])).toEqual([
+      ["Arcane Recovery", [1]],
+      ["Spellcasting", [1]],
+      ["Ability Score Improvement", [4, 8]],
+    ]);
+    expect(c.table.map((t) => [t.name, t.kind])).toEqual([
+      ["Proficiency Bonus", "proficiencyBonus"],
+      ["Cantrips Known", "other"],
+      ["1st", "spellSlots"],
+    ]);
+    expect(c.table[2]?.values).toEqual({ "1": "2", "2": "3" });
+  });
+  it("links a subclass to its parent", () => {
+    const c = normaliseClass(fx.evocation);
+    expect(ClassDetail.safeParse(c).success).toBe(true);
+    expect(c.parentClass).toEqual({ id: "srd_wizard", name: "Wizard" });
+    expect(c.hitDice).toBeNull();
+  });
+});
+
+describe("normaliseConditions", () => {
+  it("makes one condition per included document description", () => {
+    const included = (key: string) => key === "srd-2014";
+    const out = normaliseConditions(fx.blinded, included);
+    expect(out).toHaveLength(1);
+    expect(Condition.parse(out[0])).toEqual(out[0]);
+    expect(out[0]).toMatchObject({ id: "srd-2014_blinded", documentKey: "srd-2014", name: "Blinded" });
+    expect(out[0]?.description).toContain("automatically fails any ability check that requires sight.\n* Attack");
+  });
+  it("makes none when no description is from an included document", () => {
+    expect(normaliseConditions(fx.blinded, () => false)).toEqual([]);
+  });
+});
+
+describe("normaliseLicense and copyright notice", () => {
+  it("keeps the licence text and links known licences", () => {
+    const l = normaliseLicense({ key: "ogl-10a", name: "OPEN GAME LICENSE Version 1.0a", desc: "text\r\n15. COPYRIGHT NOTICE " });
+    expect(LicenseText.parse(l)).toEqual(l);
+    expect(l.text).toBe("text\n15. COPYRIGHT NOTICE");
+    expect(l.url).toContain("opengamingfoundation.org");
+  });
+  it("derives a Section 15 line for OGL documents only", () => {
+    expect(normaliseDocument(fx.koboldDocument).copyrightNotice).toBe("Tome of Beasts Copyright 2016, Kobold Press; Authors Chris Harris, Dan Dillon.");
+    expect(normaliseDocument({ ...fx.koboldDocument, licenses: [{ key: "cc-by-40", name: "CC BY" }] }).copyrightNotice).toBeNull();
+  });
+});
+
+describe("SQL builder", () => {
+  it("escapes quotes and strips NUL", () => {
+    expect(sqlText("it's\u0000 ok")).toBe("'it''s ok'");
+  });
+  it("upserts every record, then deletes stale Open5e rows last", () => {
+    const statements = buildImportStatements(
+      {
+        documents: [normaliseDocument(fx.srdDocument)],
+        licenses: [],
+        spells: [normaliseSpell(fx.fireball)],
+        monsters: [normaliseMonster(fx.goblin)],
+        classes: [normaliseClass(fx.wizard), normaliseClass(fx.evocation)],
+        conditions: normaliseConditions(fx.blinded, () => true),
+      },
+      "run-1",
+    );
+    const firstDelete = statements.findIndex((s) => s.startsWith("DELETE"));
+    expect(statements.slice(0, firstDelete).every((s) => s.startsWith("INSERT"))).toBe(true);
+    expect(statements.slice(firstDelete).every((s) => s.startsWith("DELETE") && s.includes("origin = 'open5e'"))).toBe(true);
+    const spell = statements.find((s) => s.startsWith("INSERT INTO spells"));
+    expect(spell).toContain("',sorcerer,wizard,'");
+    expect(spell).toContain("ON CONFLICT(id) DO UPDATE");
+    expect(spell).toContain("origin = 'open5e'");
+    expect(statements.filter((s) => s.startsWith("INSERT INTO classes"))).toHaveLength(2);
+  });
+});
+
+describe("foldName", () => {
+  it("lowercases and strips accents", () => {
+    expect(foldName("  \u00c9owyn\u2019s Bl\u00e9ssing ")).toBe("eowyn\u2019s blessing");
+    expect(foldName("Ni\u00f1o")).toBe("nino");
+    expect(foldName("Fireball")).toBe("fireball");
+  });
+});

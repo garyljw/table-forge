@@ -18,15 +18,19 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "test": "pnpm -r test",
-    "check:canary": "node scripts/check-client-bundle.mjs"
+    "check:canary": "node scripts/check-client-bundle.mjs",
+    "import:open5e": "tsx scripts/import-open5e.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@table-forge/core": "workspace:*",
+    "@table-forge/shared": "workspace:*",
     "@types/node": "^22.19.0",
     "eslint": "10.15.0",
     "eslint-import-resolver-typescript": "^4.4.0",
     "eslint-plugin-boundaries": "7.4.4",
     "globals": "17.14.0",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.73.0"
   }

@@ -1,0 +1,22 @@
+import { z } from "zod";
+
+/**
+ * Stable record ids and document keys: lowercase slugs that start with the source
+ * prefix, e.g. `srd_fireball`, `tob_aboleth`, `srd-2014_blinded`.
+ * Open5e keys are used as-is; private and homebrew data will use their own prefix.
+ */
+export const RecordId = z
+  .string()
+  .max(200)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/, "must be a lowercase slug");
+export type RecordId = z.infer<typeof RecordId>;
+
+export const DocumentKey = RecordId;
+export type DocumentKey = z.infer<typeof DocumentKey>;
+
+export const AbilityKey = z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]);
+export type AbilityKey = z.infer<typeof AbilityKey>;
+
+/** A key/name pair, for things like a spell's classes or a subclass's parent. */
+export const NamedRef = z.object({ id: z.string().min(1), name: z.string().min(1) });
+export type NamedRef = z.infer<typeof NamedRef>;
