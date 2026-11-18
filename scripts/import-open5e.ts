@@ -5,7 +5,9 @@
  *   pnpm import:open5e --no-apply fetch, normalise and write the SQL file only (this skips
  *                                 the comparison with the database, since it never reads it)
  *   pnpm import:open5e --force    skip the "far fewer records than the database holds" check
- *   pnpm import:open5e --remote   apply to the REMOTE database (needs a real database_id)
+ *   pnpm import:open5e --remote --target=staging      apply to the REMOTE STAGING database
+ *   pnpm import:open5e --remote --target=production --confirm-production   apply to the REMOTE PRODUCTION database
+ *                                 (--remote requires an explicit --target; production also requires --confirm-production, even with --force)
  *
  * Which documents are imported is decided by OPEN5E_CONTENT_RULES in
  * packages/core/src/open5e/config.ts. Every record is normalised by
@@ -62,11 +64,26 @@ const workerDir = path.join(root, "apps/worker");
 // Under .wrangler/, which is gitignored: generated SQL must never be committed.
 const outDir = path.join(workerDir, ".wrangler/import");
 
-const args = new Set(process.argv.slice(2));
+const rawArgs = process.argv.slice(2);
+const args = new Set(rawArgs.filter((a) => !a.startsWith("--target=")));
 const remote = args.has("--remote");
+const targets = rawArgs.filter((a) => a.startsWith("--target=")).map((a) => a.slice("--target=".length));
+
+// Argument checks, one rule at a time.
+if (targets.length > 1) throw new Error("give --target only once");
+if (targets.length === 1 && !remote) throw new Error("--target is only valid with --remote");
+if (remote && targets.length === 0) throw new Error("--remote needs --target=staging or --target=production");
+if (targets.length === 1 && targets[0] !== "staging" && targets[0] !== "production") throw new Error(`unknown target "${targets[0]}"`);
+if (args.has("--confirm-production") && targets[0] !== "production") throw new Error("--confirm-production is only valid with --target=production");
+if (targets[0] === "production" && !args.has("--confirm-production")) {
+  throw new Error("importing into PRODUCTION needs --confirm-production (this also applies with --force)");
+}
+const target = targets[0] as "staging" | "production" | undefined;
+// Staging uses wrangler.preview.jsonc (same Worker, staging D1); production uses wrangler.jsonc.
+const targetConfig = target === "staging" ? "wrangler.preview.jsonc" : "wrangler.jsonc";
 const apply = !args.has("--no-apply");
 const force = args.has("--force");
-for (const a of args) if (!["--remote", "--no-apply", "--force"].includes(a)) throw new Error(`unknown argument ${a}`);
+for (const a of args) if (!["--remote", "--no-apply", "--force", "--confirm-production"].includes(a)) throw new Error(`unknown argument ${a}`);
 
 const PAGE_LIMIT = 200;
 const apiOrigin = new URL(OPEN5E_API_BASE).origin;
@@ -184,7 +201,7 @@ function zodSummary(err: Error): string {
 async function main(): Promise<void> {
   // Marks the rows this run writes, so rows it did not write can be recognised as stale.
   const run = new Date().toISOString();
-  console.log(`Open5e import (${remote ? "REMOTE" : "local"} database${apply ? "" : ", SQL file only"})`);
+  console.log(`Open5e import (${remote ? `REMOTE ${target}` : "local"} database${apply ? "" : ", SQL file only"})`);
 
   const allDocuments = await fetchAll<RawDocument & { gamesystem: { key: string; name: string } }>("documents");
   const included = allDocuments.filter((d) => isDocumentIncluded(d));
@@ -250,10 +267,11 @@ async function main(): Promise<void> {
     includedKeys,
   );
 
-  const where = remote ? "--remote" : "--local";
+  const whereArgs = remote ? ["--remote", "--config", targetConfig] : ["--local"];
+  const where = remote ? `REMOTE ${target}` : "local";
   /** Runs one SELECT with `wrangler d1 execute --json` and returns its first row. Throws if the output is not as expected. */
-  const d1Row = (target: string, sql: string): Record<string, number> => {
-    const out = execFileSync("pnpm", ["exec", "wrangler", "d1", "execute", "DB", target, "--json", "--command", sql], { cwd: workerDir, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+  const d1Row = (sql: string): Record<string, number> => {
+    const out = execFileSync("pnpm", ["exec", "wrangler", "d1", "execute", "DB", ...whereArgs, "--json", "--command", sql], { cwd: workerDir, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
     let parsed: unknown;
     try {
       parsed = JSON.parse(out);
@@ -272,7 +290,7 @@ async function main(): Promise<void> {
   let existing: Record<string, number> | null = null;
   if (apply) {
     console.log(`\nApplying migrations (${where})...`);
-    wrangler(false, "d1", "migrations", "apply", "DB", where);
+    wrangler(false, "d1", "migrations", "apply", "DB", ...whereArgs);
     // Only rows of documents that are included now: dropping a document from the rules
     // must not look like data loss.
     const keys = [...includedKeys].map((k) => {
@@ -280,7 +298,7 @@ async function main(): Promise<void> {
       return `'${k}'`;
     });
     const counts = RULE_TABLES.map((t) => `(SELECT COUNT(*) FROM ${t} WHERE document_key IN (${keys.join(", ")}) AND document_key IN (SELECT key FROM documents WHERE origin = 'open5e')) AS ${t}`);
-    existing = d1Row(where, `SELECT ${counts.join(", ")};`);
+    existing = d1Row(`SELECT ${counts.join(", ")};`);
     for (const t of RULE_TABLES) if (typeof existing[t] !== "number") throw new Error(`could not read the existing ${t} count from D1`);
   }
   const problems = checkImport(
@@ -337,10 +355,10 @@ async function main(): Promise<void> {
 
   if (!apply) return;
   console.log(`\nApplying ${statements.length} statements (${where})...`);
-  wrangler(true, "d1", "execute", "DB", where, "--file", sqlFile, "--yes");
+  wrangler(true, "d1", "execute", "DB", ...whereArgs, "--file", sqlFile, "--yes");
 
   // Upserts that were skipped (an id or document belonging to a private/homebrew row) leave rows without this run's marker.
-  const stamped = d1Row(where, countStampedStatement(run));
+  const stamped = d1Row(countStampedStatement(run));
   const expected = { documents: documents.length, licenses: licenses.length, spells: spells.length, monsters: monsters.length, classes: classes.length, conditions: conditions.length };
   let skipped = 0;
   for (const [table, want] of Object.entries(expected)) {

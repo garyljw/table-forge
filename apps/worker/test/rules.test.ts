@@ -11,12 +11,13 @@ import {
   SpellDetailResponse,
   SpellListResponse,
 } from "@table-forge/shared";
-import { env, exports } from "cloudflare:workers";
+import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
+import { authedFetch } from "./auth.js";
 import { klass, openBundle, runStatements, SEED, seedRules, spell } from "./seed.js";
 
 async function get(path: string): Promise<Response> {
-  return exports.default.fetch(new Request(`https://example.com/api/rules${path}`));
+  return authedFetch(`https://example.com/api/rules${path}`);
 }
 
 async function names(path: string): Promise<string[]> {

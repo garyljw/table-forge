@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "table-forge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // PREVIEW config: same Worker name as production (so preview URLs stay under the Access-protected
+  // *-table-forge hostname) but bound to the STAGING database. Must match wrangler.jsonc except for the database
+  // (test/config.test.ts enforces it). Not secrets: the Access team domain and application AUD tag.
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "sparkling-mud-f4e2.cloudflareaccess.com",
+    "ACCESS_AUD": "c3fbc961ba9f05d6530f138f3037385e70cc7463ce2dba2ced9d87ecc24e554a" // gitleaks:allow — Access Application Audience tag, a public identifier, not a secret
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "table-forge-staging",
+      "database_id": "0d84c04d-f8a1-4d3e-a527-55b8678a2407",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true }
+}
