@@ -9,6 +9,7 @@ export {
   type DocumentLike,
 } from "./config.js";
 export { buildAttribution, normaliseDocument, normaliseLicense } from "./document.js";
+export { checkImport, DEFAULT_GUARD, type GuardOptions, type TypeResult } from "./guard.js";
 export { normaliseMonster } from "./monster.js";
 export type * from "./raw.js";
 export {

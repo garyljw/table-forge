@@ -11,9 +11,9 @@ import {
   SpellDetailResponse,
   SpellListResponse,
 } from "@table-forge/shared";
-import { exports } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { openBundle, runStatements, seedRules, spell } from "./seed.js";
+import { klass, openBundle, runStatements, SEED, seedRules, spell } from "./seed.js";
 
 async function get(path: string): Promise<Response> {
   return exports.default.fetch(new Request(`https://example.com/api/rules${path}`));
@@ -76,6 +76,19 @@ describe("spells list", () => {
     expect(await names("/spells?q=" + encodeURIComponent("bl\u00e9ssing"))).toEqual(["\u00c9owyn\u2019s Bl\u00e9ssing"]);
   });
 
+  it("handles a search term longer than D1's 50-byte LIKE pattern limit", async () => {
+    expect(await names(`/spells?q=${"a".repeat(100)}`)).toEqual([]);
+    expect(await names(`/spells?q=${"fireball".repeat(12)}`)).toEqual([]);
+    expect((await get(`/monsters?q=${"b".repeat(100)}`)).status).toBe(200);
+  });
+
+  it("rejects a search that folds to nothing, rather than matching everything", async () => {
+    const res = await get("/spells?q=%CC%81");
+    expect(res.status).toBe(400);
+    expect(ApiError.parse(await res.json()).issues?.[0]?.path).toBe("q");
+    expect((await get("/monsters?q=%CC%81%CC%82")).status).toBe(400);
+  });
+
   it("is not open to SQL injection through q", async () => {
     expect(await names("/spells?q=" + encodeURIComponent("'; DROP TABLE spells; --"))).toEqual([]);
     expect((await names("/spells")).length).toBe(6);
@@ -94,6 +107,7 @@ describe("spells list", () => {
 
   it("treats LIKE wildcards in the class filter as literal text", async () => {
     expect(await names("/spells?class=wi_ard")).toEqual([]);
+    expect(await names(`/spells?class=${"w".repeat(100)}`)).toEqual([]);
     expect(await names("/spells?class=wizard")).toEqual(["100% Pure_Fire", "Fire Bolt", "Fireball"]);
   });
 
@@ -236,6 +250,30 @@ describe("licenses", () => {
       ["cc-by-40", "CC TEXT"],
       ["ogl-10a", "OGL TEXT"],
     ]);
+  });
+});
+
+describe("licenses and private documents", () => {
+  it("only returns licences used by a public document", async () => {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO licenses (key, origin, name, url, text) VALUES ('private-lic', 'private', 'Private Licence', NULL, 'PRIVATE TEXT')"),
+      env.DB.prepare("INSERT INTO licenses (key, origin, name, url, text) VALUES ('unused-lic', 'open5e', 'Unused Licence', NULL, 'UNUSED TEXT')"),
+      env.DB
+        .prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES ('secret-2', 'private', 'private', 'S2', 'S2', '5e-2014', ?)")
+        .bind(JSON.stringify({ licenses: [{ key: "private-lic", name: "Private Licence", url: null }] })),
+    ]);
+    const body = LicenseListResponse.parse(await (await get("/licenses")).json());
+    expect(body.items.map((l) => l.key)).toEqual(["cc-by-40", "ogl-10a"]);
+    expect(JSON.stringify(body)).not.toContain("PRIVATE TEXT");
+  });
+});
+
+describe("class subclasses", () => {
+  it("returns every subclass, not just the first 100", async () => {
+    const many = Array.from({ length: 120 }, (_, i) => klass(`srd_sub-${String(i).padStart(3, "0")}`, `Sub ${i}`, { parentClass: { id: "srd_fighter", name: "Fighter" } }));
+    await runStatements(openBundle("run-1", { classes: [...SEED.classes.filter((c) => c.documentKey !== "secret-book"), ...many] }));
+    const body = ClassDetailResponse.parse(await (await get("/classes/srd_fighter")).json());
+    expect(body.subclasses).toHaveLength(120);
   });
 });
 

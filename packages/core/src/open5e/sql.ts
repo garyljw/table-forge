@@ -1,4 +1,4 @@
-import type { ClassDetail, Condition, LicenseText, Monster, SourceDocument, Spell } from "@table-forge/shared";
+import { RULE_TABLES, type ClassDetail, type Condition, type LicenseText, type Monster, type RuleTable, type SourceDocument, type Spell } from "@table-forge/shared";
 import { foldName } from "../fold.js";
 
 /**
@@ -55,7 +55,6 @@ const sqlNullableText = (value: string | null): string => (value === null ? "NUL
 const json = (value: unknown): string => sqlText(JSON.stringify(value));
 
 type Column = [name: string, sqlValue: string];
-type RecordTable = "spells" | "monsters" | "classes" | "conditions";
 
 const updates = (cols: Column[], skip: string): string =>
   cols
@@ -68,7 +67,7 @@ const updates = (cols: Column[], skip: string): string =>
  * existing row only when that row's document is an Open5e one too, so an Open5e record
  * can never overwrite a private or homebrew row that happens to share its id.
  */
-function recordUpsert(table: RecordTable, documentKey: string, cols: Column[], run: string): string {
+function recordUpsert(table: RuleTable, documentKey: string, cols: Column[], run: string): string {
   const all: Column[] = [...cols, ["import_run", sqlText(run)]];
   return (
     `INSERT INTO ${table} (${all.map(([n]) => n).join(", ")}) SELECT ${all.map(([, v]) => v).join(", ")} ` +
@@ -192,7 +191,7 @@ export function conditionStatement(c: Condition, run: string): string {
 export function staleRowStatements(run: string): string[] {
   const stale = `import_run IS NOT ${sqlText(run)}`;
   return [
-    ...(["spells", "monsters", "classes", "conditions"] as const).map(
+    ...RULE_TABLES.map(
       (table) => `DELETE FROM ${table} WHERE document_key IN (SELECT key FROM documents WHERE origin = 'open5e') AND ${stale};`,
     ),
     `DELETE FROM documents WHERE origin = 'open5e' AND ${stale};`,
@@ -204,7 +203,7 @@ export function staleRowStatements(run: string): string[] {
 export function countStampedStatement(run: string): string {
   const r = sqlText(run);
   const one = (t: string) => `(SELECT COUNT(*) FROM ${t} WHERE import_run = ${r}) AS ${t}`;
-  return `SELECT ${["documents", "licenses", "spells", "monsters", "classes", "conditions"].map(one).join(", ")};`;
+  return `SELECT ${["documents", "licenses", ...RULE_TABLES].map(one).join(", ")};`;
 }
 
 /** The whole import, in order: upserts first, stale deletes last. */

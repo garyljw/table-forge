@@ -2,23 +2,33 @@
  * Imports Open5e rules data into D1.
  *
  *   pnpm import:open5e            fetch, normalise, write SQL, apply to the LOCAL database
- *   pnpm import:open5e --no-apply fetch, normalise and write the SQL file only
+ *   pnpm import:open5e --no-apply fetch, normalise and write the SQL file only (this skips
+ *                                 the comparison with the database, since it never reads it)
+ *   pnpm import:open5e --force    skip the "far fewer records than the database holds" check
  *   pnpm import:open5e --remote   apply to the REMOTE database (needs a real database_id)
  *
  * Which documents are imported is decided by OPEN5E_CONTENT_RULES in
  * packages/core/src/open5e/config.ts. Every record is normalised by
- * packages/core/src/open5e and validated against the packages/shared schemas; a record that
- * fails is counted and skipped, not allowed to abort the import. The import deletes and
- * upserts every row, stamped with this run's `import_run` marker, and deletes Open5e rows
- * that did not get the marker only at the very end of the file. It is safe to re-run, a run
- * that fails partway leaves the previous data in place, and private or homebrew rows are
- * never touched or overwritten (an upsert that would collide with one is skipped and counted).
+ * packages/core/src/open5e and validated against the packages/shared schemas. A record
+ * that fails is counted and skipped; it does not abort the import.
+ *
+ * Safety:
+ *  - Guard: before any SQL is written, checkImport (packages/core/src/open5e/guard.ts)
+ *    stops the run with a non-zero exit if a type has no valid records, too many records
+ *    fail validation, or a type has far fewer records than the database holds now.
+ *    The migrations are applied first, because the guard reads the database.
+ *  - Upserts: every row is upserted with this run's `import_run` marker.
+ *  - Deletes last: Open5e rows without the marker are deleted at the very end of the
+ *    file, so a run that fails partway leaves the previous data in place.
+ *  - Private and homebrew rows are never touched or overwritten. An upsert that would
+ *    collide with one is skipped and counted.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  checkImport,
   classStatement,
   conditionStatement,
   countStampedStatement,
@@ -44,7 +54,7 @@ import {
   type RawLicense,
   type RawSpell,
 } from "@table-forge/core";
-import { ClassDetail, Condition, LicenseText, Monster, SourceDocument, Spell } from "@table-forge/shared";
+import { RULE_TABLES, ClassDetail, Condition, LicenseText, Monster, SourceDocument, Spell } from "@table-forge/shared";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workerDir = path.join(root, "apps/worker");
@@ -54,7 +64,8 @@ const outDir = path.join(workerDir, ".wrangler/import");
 const args = new Set(process.argv.slice(2));
 const remote = args.has("--remote");
 const apply = !args.has("--no-apply");
-for (const a of args) if (!["--remote", "--no-apply"].includes(a)) throw new Error(`unknown argument ${a}`);
+const force = args.has("--force");
+for (const a of args) if (!["--remote", "--no-apply", "--force"].includes(a)) throw new Error(`unknown argument ${a}`);
 
 const PAGE_LIMIT = 200;
 const apiOrigin = new URL(OPEN5E_API_BASE).origin;
@@ -157,6 +168,10 @@ function convert<Raw extends { key: string }, Out extends { id: string; document
   return out;
 }
 
+function summary(s: Stats): { fetched: number; valid: number; failed: number } {
+  return { fetched: s.fetched, valid: s.imported, failed: s.failed };
+}
+
 function zodSummary(err: Error): string {
   const issues = (err as unknown as { issues?: { path: (string | number)[]; message: string }[] }).issues ?? [];
   return issues
@@ -208,6 +223,50 @@ async function main(): Promise<void> {
     includedKeys,
   );
 
+  const where = remote ? "--remote" : "--local";
+  /** Runs one SELECT with `wrangler d1 execute --json` and returns its first row. Throws if the output is not as expected. */
+  const d1Row = (target: string, sql: string): Record<string, number> => {
+    const out = execFileSync("pnpm", ["exec", "wrangler", "d1", "execute", "DB", target, "--json", "--command", sql], { cwd: workerDir, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(out);
+    } catch {
+      throw new Error(`could not parse wrangler's JSON output: ${out.slice(0, 200)}`);
+    }
+    const row = (parsed as { results?: Record<string, number>[] }[])[0]?.results?.[0];
+    if (!row) throw new Error("wrangler returned no row for a count query");
+    return row;
+  };
+  const wrangler = (quiet: boolean, ...a: string[]) =>
+    execFileSync("pnpm", ["exec", "wrangler", ...a], { cwd: workerDir, stdio: quiet ? ["ignore", "ignore", "inherit"] : "inherit", maxBuffer: 1 << 28 });
+
+  // The stale-row deletes remove whatever Open5e did not return this time, so stop before writing
+  // anything if the fetch or the validation went badly wrong.
+  let existing: Record<string, number> | null = null;
+  if (apply) {
+    console.log(`\nApplying migrations (${where})...`);
+    wrangler(false, "d1", "migrations", "apply", "DB", where);
+    // Only rows of documents that are included now: dropping a document from the rules
+    // must not look like data loss.
+    const keys = [...includedKeys].map((k) => {
+      if (!/^[a-z0-9][a-z0-9_-]*$/.test(k)) throw new Error(`unexpected document key "${k}"`);
+      return `'${k}'`;
+    });
+    const counts = RULE_TABLES.map((t) => `(SELECT COUNT(*) FROM ${t} WHERE document_key IN (${keys.join(", ")}) AND document_key IN (SELECT key FROM documents WHERE origin = 'open5e')) AS ${t}`);
+    existing = d1Row(where, `SELECT ${counts.join(", ")};`);
+    for (const t of RULE_TABLES) if (typeof existing[t] !== "number") throw new Error(`could not read the existing ${t} count from D1`);
+  }
+  const problems = checkImport(
+    { spells: summary(stats.spells), monsters: summary(stats.monsters), classes: summary(stats.classes), conditions: summary(stats.conditions) },
+    existing,
+    { maxFailureRate: 0.05, maxDropRate: 0.2, force },
+  );
+  if (problems.length > 0) {
+    console.error("\nImport stopped. Only the migrations were applied; no data was written or changed:");
+    for (const p of problems) console.error(`  - ${p}`);
+    process.exit(1);
+  }
+
   // Only documents that actually supply a record are stored (and credited).
   const used = new Set([...spells, ...monsters, ...classes, ...conditions].map((c) => c.record.documentKey));
   const documents = included
@@ -250,18 +309,11 @@ async function main(): Promise<void> {
   }
 
   if (!apply) return;
-  const where = remote ? "--remote" : "--local";
-  // wrangler prints one JSON result per statement, so its stdout is kept out of the log.
-  const wrangler = (quiet: boolean, ...a: string[]) =>
-    execFileSync("pnpm", ["exec", "wrangler", ...a], { cwd: workerDir, stdio: quiet ? ["ignore", "ignore", "inherit"] : "inherit", maxBuffer: 1 << 28 });
-  console.log(`\nApplying migrations (${where})...`);
-  wrangler(false, "d1", "migrations", "apply", "DB", where);
   console.log(`\nApplying ${statements.length} statements (${where})...`);
   wrangler(true, "d1", "execute", "DB", where, "--file", sqlFile, "--yes");
 
   // Upserts that were skipped (an id or document belonging to a private/homebrew row) leave rows without this run's marker.
-  const out = execFileSync("pnpm", ["exec", "wrangler", "d1", "execute", "DB", where, "--json", "--command", countStampedStatement(run)], { cwd: workerDir, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
-  const stamped = (JSON.parse(out.slice(out.indexOf("["))) as { results: Record<string, number>[] }[])[0]?.results[0] ?? {};
+  const stamped = d1Row(where, countStampedStatement(run));
   const expected = { documents: documents.length, licenses: licenses.length, spells: spells.length, monsters: monsters.length, classes: classes.length, conditions: conditions.length };
   let skipped = 0;
   for (const [table, want] of Object.entries(expected)) {

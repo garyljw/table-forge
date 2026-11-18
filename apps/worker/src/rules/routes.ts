@@ -13,6 +13,7 @@ import {
   MonsterListQuery,
   MonsterListResponse,
   RecordId,
+  RULE_TABLES,
   SourceDocument,
   SpellDetailResponse,
   SpellListQuery,
@@ -20,7 +21,7 @@ import {
 } from "@table-forge/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../env.js";
-import { likeContains, pageEnvelope, selectDetail, selectPage, Where } from "./db.js";
+import { pageEnvelope, selectChildClasses, selectDetail, selectPage, Where } from "./db.js";
 import { notFound, parseQuery } from "./query.js";
 
 /** `/api/rules/*`: the read-only rules browser. Mounted under `/api`, behind whatever auth middleware that gets. */
@@ -46,7 +47,7 @@ rulesRoutes.get("/spells", async (c) => {
   const where = new Where().nameContains(q.q).document(q.document);
   if (q.level !== undefined) where.add("t.level = ?", q.level);
   if (q.school !== undefined) where.add("t.school = ?", q.school);
-  if (q.class !== undefined) where.add("t.classes LIKE ? ESCAPE '\\'", likeContains(`,${q.class},`));
+  if (q.class !== undefined) where.add("instr(t.classes, ?) > 0", `,${q.class},`);
   if (q.concentration !== undefined) where.add("t.concentration = ?", q.concentration ? 1 : 0);
   if (q.ritual !== undefined) where.add("t.ritual = ?", q.ritual ? 1 : 0);
   const { rows, total } = await selectPage<SpellRow>(
@@ -164,15 +165,8 @@ rulesRoutes.get("/classes/:id", async (c) => {
   const id = RecordId.safeParse(c.req.param("id"));
   const found = id.success ? await selectDetail(c.env.DB, "classes", id.data) : null;
   if (!id.success || !found) return notFound(c, "Class");
-  const subclasses = await selectPage<ClassRow>(
-    c.env.DB,
-    "classes",
-    CLASS_COLUMNS,
-    new Where().add("t.parent_id = ?", id.data),
-    1,
-    100,
-  );
-  return c.json(ClassDetailResponse.parse({ ...found, subclasses: subclasses.rows.map(classSummary) }));
+  const subclasses = await selectChildClasses<ClassRow>(c.env.DB, CLASS_COLUMNS, id.data);
+  return c.json(ClassDetailResponse.parse({ ...found, subclasses: subclasses.map(classSummary) }));
 });
 
 interface ConditionRow {
@@ -201,10 +195,9 @@ rulesRoutes.get("/conditions/:id", async (c) => {
 /** Every public document, with how many records of each type it supplies. For the credits page. */
 rulesRoutes.get("/documents", async (c) => {
   const db = c.env.DB;
-  const tables = ["spells", "monsters", "classes", "conditions"] as const;
   const [docs, ...counts] = await db.batch([
     db.prepare("SELECT data FROM documents WHERE visibility = 'public' ORDER BY display_name COLLATE NOCASE, key"),
-    ...tables.map((t) => db.prepare(`SELECT document_key, COUNT(*) AS n FROM ${t} GROUP BY document_key`)),
+    ...RULE_TABLES.map((t) => db.prepare(`SELECT document_key, COUNT(*) AS n FROM ${t} GROUP BY document_key`)),
   ]);
   const countFor = (index: number, key: string) =>
     Number((counts[index]?.results as { document_key: string; n: number }[] | undefined)?.find((r) => r.document_key === key)?.n ?? 0);
@@ -218,8 +211,13 @@ rulesRoutes.get("/documents", async (c) => {
   return c.json(DocumentListResponse.parse({ items }));
 });
 
-/** Full licence texts (OGL 1.0a, CC-BY-4.0, ...). Documents refer to them by licence key. */
+/** Full licence texts (OGL 1.0a, CC-BY-4.0, ...) for licences that a public document uses. Documents refer to them by licence key. */
 rulesRoutes.get("/licenses", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT key, name, url, text FROM licenses ORDER BY name COLLATE NOCASE, key").all();
+  const { results } = await c.env.DB.prepare(
+      `SELECT l.key, l.name, l.url, l.text FROM licenses l WHERE EXISTS (
+         SELECT 1 FROM documents d, json_each(d.data, '$.licenses') j
+         WHERE d.visibility = 'public' AND json_extract(j.value, '$.key') = l.key
+       ) ORDER BY l.name COLLATE NOCASE, l.key`,
+    ).all();
   return c.json(LicenseListResponse.parse({ items: results.map((r) => LicenseText.parse(r)) }));
 });
