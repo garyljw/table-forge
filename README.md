@@ -71,7 +71,7 @@ Without the file, `pnpm dev` runs but every `/api` route except `/api/health` re
 Cloudflare Workers Builds (Git integration) deploys; GitHub Actions only checks and holds no Cloudflare tokens. Merging to `main` is the production deploy.
 
 - **Access** protects the whole site (production and previews) with an email allow-list. The Worker also verifies the Access JWT on every `/api` route except `/api/health` (config in `vars`: `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`; not secrets). Missing config makes the Worker refuse everything.
-- **Two databases.** Production uses D1 `table-forge` (`apps/worker/wrangler.jsonc`). Preview branches use D1 `table-forge-staging` (`apps/worker/wrangler.preview.jsonc`), with the same Worker name so preview URLs stay under the Access-protected `*-table-forge.garyljw.workers.dev` hostname. A test fails if the two configs differ in anything but the database.
+- **Two databases.** Production uses D1 `table-forge` (`apps/worker/wrangler.jsonc`). Preview branches use D1 `table-forge-staging`, declared in the `previews` block of the same `wrangler.jsonc` (Worker Previews take their bindings only from that block, never from the production bindings). Preview URLs look like `<branch>-table-forge.garyljw.workers.dev`, which stays under the Access-protected `*-table-forge.garyljw.workers.dev` hostname. `apps/worker/wrangler.staging.jsonc` exists only so `d1 migrations apply` can reach staging (it reads top-level `d1_databases` only). A test fails if the previews database is not staging, if production ids leak into previews, or if the vars drift.
 
 Dashboard settings (Workers & Pages, table-forge, Settings, Builds):
 
@@ -81,8 +81,9 @@ Dashboard settings (Workers & Pages, table-forge, Settings, Builds):
 | Build command | `pnpm install --frozen-lockfile && pnpm build` (the only place the web app is built) |
 | Deploy command (production, `main`) | `pnpm deploy:prod` |
 | Non-production branch deploy command | `pnpm deploy:preview` |
+| Previews (open beta) tab, Preview command | `pnpm deploy:preview` |
 
-`deploy:prod` and `deploy:preview` are for Workers Builds only, and run after the Build command (they do not build). Each applies the D1 migrations to the right database (`wrangler d1 migrations apply DB --remote`) and then deploys (`wrangler deploy`) or uploads a preview version (`wrangler versions upload --config wrangler.preview.jsonc`). The build token needs D1 edit permission as well as Workers edit.
+`deploy:prod` and `deploy:preview` are for Workers Builds only, and run after the Build command (they do not build). Each applies the D1 migrations to the right database (`wrangler d1 migrations apply DB --remote`) and then deploys (`wrangler deploy`) or creates or updates the branch's Preview (`wrangler preview --ignore-base-config`, which ignores any dashboard Preview base config so only the `previews` block applies). The build token needs D1 edit permission as well as Workers edit.
 
 Things to know:
 

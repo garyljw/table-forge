@@ -79,8 +79,8 @@ if (targets[0] === "production" && !args.has("--confirm-production")) {
   throw new Error("importing into PRODUCTION needs --confirm-production (this also applies with --force)");
 }
 const target = targets[0] as "staging" | "production" | undefined;
-// Staging uses wrangler.preview.jsonc (same Worker, staging D1); production uses wrangler.jsonc.
-const targetConfig = target === "staging" ? "wrangler.preview.jsonc" : "wrangler.jsonc";
+// Staging uses wrangler.staging.jsonc (staging D1 only); production uses wrangler.jsonc.
+const targetConfig = target === "staging" ? "wrangler.staging.jsonc" : "wrangler.jsonc";
 const apply = !args.has("--no-apply");
 const force = args.has("--force");
 for (const a of args) if (!["--remote", "--no-apply", "--force", "--confirm-production"].includes(a)) throw new Error(`unknown argument ${a}`);
