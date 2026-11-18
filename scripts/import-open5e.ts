@@ -41,6 +41,7 @@ import {
   spellStatement,
   staleRowStatements,
   normaliseClass,
+  resolveSubclassParents,
   normaliseConditions,
   normaliseDocument,
   normaliseMonster,
@@ -212,7 +213,33 @@ async function main(): Promise<void> {
 
   const spells = convert("spells", rawSpells, stats.spells, (r) => [normaliseSpell(r)], Spell, (r) => spellStatement(r, run), includedKeys);
   const monsters = convert("monsters", rawCreatures, stats.monsters, (r) => [normaliseMonster(r)], Monster, (r) => monsterStatement(r, run), includedKeys);
-  const classes = convert("classes", rawClasses, stats.classes, (r) => [normaliseClass(r)], ClassDetail, (r) => classStatement(r, run), includedKeys);
+  // A subclass's parent must be a class we store (see resolveSubclassParents), so normalise every class first,
+  // resolve the parents across the whole set, and only then validate, count and build statements, once each.
+  const normalisedClasses = new Map<string, ClassDetail | Error>();
+  for (const r of rawClasses) {
+    try {
+      normalisedClasses.set(r.key, normaliseClass(r));
+    } catch (err) {
+      normalisedClasses.set(r.key, err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+  const resolved = resolveSubclassParents([...normalisedClasses.values()].filter((c): c is ClassDetail => !(c instanceof Error)));
+  for (const c of resolved.classes) normalisedClasses.set(c.id, c);
+  const classes = convert(
+    "classes",
+    rawClasses,
+    stats.classes,
+    (r) => {
+      const c = normalisedClasses.get(r.key);
+      if (c instanceof Error) throw c;
+      return c ? [c] : [];
+    },
+    ClassDetail,
+    (r) => classStatement(r, run),
+    includedKeys,
+  );
+  console.log(`Subclass parents: ${resolved.remapped} remapped to a stored class, ${resolved.unresolved.length} unresolved (kept as subclasses, parent shown as text)`);
+  for (const u of resolved.unresolved) console.log(`  unresolved: ${u.id} (${u.name}) wanted parent "${u.parentClass?.name ?? "?"}"`);
   const conditions = convert(
     "conditions",
     rawConditions,

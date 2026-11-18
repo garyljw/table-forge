@@ -9,11 +9,23 @@ export type DocumentOrigin = z.infer<typeof DocumentOrigin>;
 export const DocumentVisibility = z.enum(["public", "private"]);
 export type DocumentVisibility = z.infer<typeof DocumentVisibility>;
 
+/**
+ * A URL that is safe to render as a link: `http:` or `https:` only. Anything else (`javascript:`,
+ * `data:`, junk) becomes null instead of failing the whole response, so one bad record cannot
+ * take down a list. `z.string().url()` alone accepts `javascript:` URLs.
+ */
+// Note: this is a read/sanitise schema. It quietly drops bad values so display never breaks. A future
+// write path (homebrew or private-data entry) must validate URLs strictly and reject them, not rely on this.
+export const HttpUrl = z
+  .string()
+  .nullable()
+  .transform((u) => (u !== null && /^https?:\/\/[^\s]+$/i.test(u) ? u : null));
+
 export const DocumentLicense = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
   /** Link to the licence text, when we know it. */
-  url: z.string().url().nullable(),
+  url: HttpUrl,
 });
 export type DocumentLicense = z.infer<typeof DocumentLicense>;
 
@@ -21,7 +33,7 @@ export type DocumentLicense = z.infer<typeof DocumentLicense>;
 export const LicenseText = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
-  url: z.string().url().nullable(),
+  url: HttpUrl,
   text: z.string().min(1),
 });
 export type LicenseText = z.infer<typeof LicenseText>;
@@ -48,7 +60,7 @@ export const SourceDocument = z.object({
    */
   copyrightNotice: z.string().nullable(),
   /** The document's own page (Open5e's `permalink`). */
-  url: z.string().url().nullable(),
+  url: HttpUrl,
   publicationDate: z.string().nullable(),
   origin: DocumentOrigin,
   visibility: DocumentVisibility,

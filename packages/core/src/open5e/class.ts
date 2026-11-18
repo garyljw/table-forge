@@ -52,3 +52,39 @@ export function normaliseClass(raw: RawClass): ClassDetail {
     table,
   };
 }
+
+export interface ParentResolution {
+  classes: ClassDetail[];
+  /** Subclasses whose parent id was pointed at a class that exists in the data. */
+  remapped: number;
+  /** Subclasses whose parent could not be found; they keep the parent's name and get a null parent id. */
+  unresolved: ClassDetail[];
+}
+
+/**
+ * A subclass's parent id must be the id of a class we actually store. Open5e sometimes points at a class
+ * from a document we do not include (for example `srd-2024_wizard`), so match the parent by name to a
+ * stored base class instead. When no single base class matches, the subclass stays a subclass but its parent id becomes null.
+ */
+export function resolveSubclassParents(classes: readonly ClassDetail[]): ParentResolution {
+  const ids = new Set(classes.map((c) => c.id));
+  const bases = classes.filter((c) => c.parentClass === null);
+  let remapped = 0;
+  const unresolved: ClassDetail[] = [];
+  const out = classes.map((c) => {
+    const parent = c.parentClass;
+    if (parent === null || parent.id === null || ids.has(parent.id)) return c;
+    const slug = parent.id.slice(parent.id.indexOf("_") + 1);
+    const named = bases.filter((b) => b.name.toLowerCase() === parent.name.toLowerCase());
+    const match = named.length === 1 ? named[0] : named.find((b) => b.id.endsWith(`_${slug}`));
+    if (match) {
+      remapped++;
+      return { ...c, parentClass: { id: match.id, name: match.name } };
+    }
+    // Still a subclass: the parent keeps its name but has no id, so it is shown as text and never linked.
+    const orphan = { ...c, parentClass: { id: null, name: parent.name } };
+    unresolved.push(orphan);
+    return orphan;
+  });
+  return { classes: out, remapped, unresolved };
+}

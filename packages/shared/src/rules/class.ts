@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { DocumentKey, NamedRef, RecordId } from "./common.js";
+import { DocumentKey, RecordId } from "./common.js";
+
+/**
+ * A subclass's parent. `id` is null when the source's parent is not a class we store; the subclass
+ * is still a subclass, and the name is shown as plain text.
+ */
+export const ParentClassRef = z.object({ id: z.string().min(1).nullable(), name: z.string().min(1) });
+export type ParentClassRef = z.infer<typeof ParentClassRef>;
 
 export const ClassFeature = z.object({
   id: z.string().min(1),
@@ -24,7 +31,7 @@ export const ClassSummary = z.object({
   documentKey: DocumentKey,
   name: z.string().min(1),
   /** The parent class, when this is a subclass (archetype). */
-  parentClass: NamedRef.nullable(),
+  parentClass: ParentClassRef.nullable(),
   /** Hit die, e.g. `D8`. Subclasses usually have none. */
   hitDice: z.string().nullable(),
   /** `FULL`, `HALF`, `THIRD`, `NONE`, or null when the source does not say. */

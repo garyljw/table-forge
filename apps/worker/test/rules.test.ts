@@ -243,6 +243,19 @@ describe("documents", () => {
   });
 });
 
+describe("documents with an unsafe url", () => {
+  it("still returns 200, with the url nulled", async () => {
+    await env.DB.prepare("UPDATE documents SET data = json_set(data, '$.url', 'javascript:alert(1)', '$.licenses[0].url', 'data:text/html,x') WHERE key = 'srd-2014'").run();
+    const res = await get("/documents");
+    expect(res.status).toBe(200);
+    const body = DocumentListResponse.parse(await res.json());
+    expect(body.items[0]?.url).toBeNull();
+    expect(body.items[0]?.licenses[0]?.url).toBeNull();
+    expect(JSON.stringify(body)).not.toContain("javascript:");
+    expect((await get("/spells/srd_fireball")).status).toBeLessThan(500);
+  });
+});
+
 describe("licenses", () => {
   it("serves the full licence texts", async () => {
     const body = LicenseListResponse.parse(await (await get("/licenses")).json());
@@ -274,6 +287,17 @@ describe("class subclasses", () => {
     await runStatements(openBundle("run-1", { classes: [...SEED.classes.filter((c) => c.documentKey !== "secret-book"), ...many] }));
     const body = ClassDetailResponse.parse(await (await get("/classes/srd_fighter")).json());
     expect(body.subclasses).toHaveLength(120);
+  });
+});
+
+describe("subclass whose parent is not stored", () => {
+  it("stays a subclass: kind filters agree, and the parent has no id", async () => {
+    const orphan = klass("srd_orphan", "Orphan Path", { parentClass: { id: null, name: "Artificer" } });
+    await runStatements(openBundle("run-1", { classes: [...SEED.classes.filter((c) => c.documentKey !== "secret-book"), orphan] }));
+    expect(await names("/classes?kind=subclass")).toContain("Orphan Path");
+    expect(await names("/classes?kind=class")).not.toContain("Orphan Path");
+    const body = ClassDetailResponse.parse(await (await get("/classes/srd_orphan")).json());
+    expect(body.data.parentClass).toEqual({ id: null, name: "Artificer" });
   });
 });
 

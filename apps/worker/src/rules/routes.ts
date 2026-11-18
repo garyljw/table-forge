@@ -144,7 +144,8 @@ const classSummary = (r: ClassRow): ClassSummary => ({
   id: r.id,
   documentKey: r.document_key,
   name: r.name,
-  parentClass: r.parent_id !== null && r.parent_name !== null ? { id: r.parent_id, name: r.parent_name } : null,
+  // parent_name is set for every subclass; parent_id is null when the parent is not a stored class.
+  parentClass: r.parent_name !== null ? { id: r.parent_id, name: r.parent_name } : null,
   hitDice: r.hit_dice,
   casterType: r.caster_type,
 });
@@ -154,8 +155,8 @@ rulesRoutes.get("/classes", async (c) => {
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
   const where = new Where().nameContains(q.q).document(q.document);
-  if (q.kind === "class") where.add("t.parent_id IS NULL");
-  if (q.kind === "subclass") where.add("t.parent_id IS NOT NULL");
+  if (q.kind === "class") where.add("t.parent_name IS NULL");
+  if (q.kind === "subclass") where.add("t.parent_name IS NOT NULL");
   if (q.parent !== undefined) where.add("t.parent_id = ?", q.parent);
   const { rows, total } = await selectPage<ClassRow>(c.env.DB, "classes", CLASS_COLUMNS, where, q.page, q.pageSize);
   return c.json(ClassListResponse.parse(pageEnvelope(rows.map(classSummary), total, q.page, q.pageSize)));

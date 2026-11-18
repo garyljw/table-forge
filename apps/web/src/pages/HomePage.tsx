@@ -1,0 +1,28 @@
+import { Link } from "wouter";
+
+const SECTIONS = [
+  { href: "/spells", title: "Spells", blurb: "Search by name, level, school or class." },
+  { href: "/monsters", title: "Monsters", blurb: "Stat blocks, filtered by type, size and challenge rating." },
+  { href: "/classes", title: "Classes", blurb: "Level tables, features and subclasses." },
+  { href: "/conditions", title: "Conditions", blurb: "What blinded, grappled and the rest actually do." },
+  { href: "/credits", title: "Credits and licences", blurb: "Where the rules text comes from." },
+];
+
+export function HomePage() {
+  return (
+    <section>
+      <h1>Rules browser</h1>
+      <p>Look things up for the 2014 rules (5e), from your laptop or phone.</p>
+      <ul className="cards">
+        {SECTIONS.map((s) => (
+          <li key={s.href}>
+            <Link className="tile" href={s.href}>
+              <strong>{s.title}</strong>
+              <span>{s.blurb}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

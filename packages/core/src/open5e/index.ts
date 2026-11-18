@@ -1,4 +1,4 @@
-export { normaliseClass } from "./class.js";
+export { normaliseClass, resolveSubclassParents, type ParentResolution } from "./class.js";
 export { normaliseConditions } from "./condition.js";
 export {
   ATTRIBUTION_OVERRIDES,
