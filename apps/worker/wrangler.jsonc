@@ -8,5 +8,33 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
-  "observability": { "enabled": true }
+  // Top level = PRODUCTION. Not secrets: the Access team domain and application AUD tag.
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "sparkling-mud-f4e2.cloudflareaccess.com",
+    "ACCESS_AUD": "c3fbc961ba9f05d6530f138f3037385e70cc7463ce2dba2ced9d87ecc24e554a" // gitleaks:allow — Access Application Audience tag, a public identifier, not a secret
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "table-forge",
+      "database_id": "26bd7e1d-be10-4ce3-9c36-c0dca3c1ade3",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true },
+  // Worker Previews (`wrangler preview --ignore-base-config`). Preview bindings come ONLY from this block, never from
+  // the top-level production bindings, so DB must be declared here and must be STAGING. test/config.test.ts enforces it.
+  "previews": {
+    "vars": {
+      "ACCESS_TEAM_DOMAIN": "sparkling-mud-f4e2.cloudflareaccess.com",
+      "ACCESS_AUD": "c3fbc961ba9f05d6530f138f3037385e70cc7463ce2dba2ced9d87ecc24e554a" // gitleaks:allow — Access Application Audience tag, a public identifier, not a secret
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "table-forge-staging",
+        "database_id": "0d84c04d-f8a1-4d3e-a527-55b8678a2407"
+      }
+    ]
+  }
 }

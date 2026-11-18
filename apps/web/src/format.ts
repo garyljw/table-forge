@@ -1,0 +1,71 @@
+import { challengeRatingProficiencyBonus, challengeRatingXp, formatChallengeRating } from "@table-forge/core";
+
+/** Small display helpers. Source keys like `bonus-action` or `1minute` become readable text. */
+
+export function capitalise(s: string): string {
+  return s === "" ? s : s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function titleKey(key: string): string {
+  return capitalise(key.replace(/[-_]/g, " "));
+}
+
+export function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+/** `3rd-level evocation` or `Evocation cantrip`. */
+export function spellSubtitle(level: number, school: string): string {
+  return level === 0 ? `${titleKey(school)} cantrip` : `${ordinal(level)}-level ${school}`;
+}
+
+/** `action` → `1 action`, `1minute` → `1 minute`, `10minutes` → `10 minutes`. */
+export function castingTimeLabel(key: string): string {
+  const m = /^(\d+)([a-z-]+)$/.exec(key);
+  if (m) return `${m[1]} ${(m[2] ?? "").replace(/-/g, " ")}`;
+  return `1 ${key.replace(/-/g, " ")}`;
+}
+
+/** The core CR helpers throw outside 0 to 30. Third-party data can hold anything, so the UI shows the raw value instead. */
+export function safeCr(cr: number): { label: string; xp: number | null; proficiencyBonus: number | null } {
+  try {
+    return {
+      label: formatChallengeRating(cr),
+      xp: challengeRatingXp(cr),
+      proficiencyBonus: challengeRatingProficiencyBonus(cr),
+    };
+  } catch {
+    return { label: String(cr), xp: null, proficiencyBonus: null };
+  }
+}
+
+export function signed(n: number): string {
+  return n >= 0 ? `+${n}` : `-${Math.abs(n)}`;
+}
+
+/** Only `http:` and `https:` URLs may become links (a `javascript:` URL would run script when clicked). */
+export function safeHttpUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** `<select>` options from slug keys. */
+export function keyOptions(keys: string[]): { value: string; label: string }[] {
+  return keys.map((k) => ({ value: k, label: titleKey(k) }));
+}

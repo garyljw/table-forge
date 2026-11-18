@@ -1,0 +1,17 @@
+/** Open5e text uses CRLF in places and has stray edge whitespace. */
+export function cleanText(value: string | null | undefined): string {
+  return (value ?? "").replace(/\r\n?/g, "\n").trim();
+}
+
+export function cleanOrNull(value: string | null | undefined): string | null {
+  const text = cleanText(value);
+  return text === "" ? null : text;
+}
+
+export function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}

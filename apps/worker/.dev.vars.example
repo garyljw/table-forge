@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored) for `pnpm dev`:  cp apps/worker/.dev.vars.example apps/worker/.dev.vars
+# Local-dev auth bypass: wrangler dev has no Cloudflare Access in front of it, so requests
+# are treated as this user. Only honoured for localhost/127.0.0.1 requests. Never deployed.
+ACCESS_DEV_IDENTITY=dev@example.com

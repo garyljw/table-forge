@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // MIGRATIONS-ONLY config for the STAGING database. `wrangler d1 migrations apply` reads only top-level
+  // d1_databases, and the real preview binding lives in the `previews` block of wrangler.jsonc. Never deployed.
+  // test/config.test.ts keeps this identical to that previews binding.
+  "name": "table-forge",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "table-forge-staging",
+      "database_id": "0d84c04d-f8a1-4d3e-a527-55b8678a2407",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

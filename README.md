@@ -8,7 +8,7 @@ A self-hosted Dungeons & Dragons 5e (2014 rules) companion for an in-person tabl
 
 ## Status
 
-Skeleton only: a hello-world page and a `/api/health` endpoint. No features yet.
+Rules browser (spells, monsters, classes, conditions) behind Cloudflare Access. No maps or characters yet.
 
 ## Layout
 
@@ -52,18 +52,52 @@ pnpm preview    # builds, then serves everything at http://localhost:8787
 | `pnpm test` | All tests (core and shared unit tests, Worker integration test) |
 | `pnpm check:canary` | After `pnpm build`: fails if server-only code leaked into the front-end bundle |
 
-## Cloudflare Workers Builds settings
+## Local dev and `.dev.vars`
 
-Set these in the Cloudflare dashboard (Workers & Pages, table-forge, Settings, Builds):
+`wrangler dev` has no Cloudflare Access in front of it, so `/api/*` would return 401. One-time step:
+
+```sh
+cp apps/worker/.dev.vars.example apps/worker/.dev.vars
+```
+
+This sets `ACCESS_DEV_IDENTITY=dev@example.com`, a bypass that is honoured only for requests to `localhost` or `127.0.0.1` that did not come through Cloudflare's edge (no `cf-ray` header). `.dev.vars` is gitignored and never deployed; no wrangler config contains this variable. **Warning:** the bypass trusts the request's host name, which a LAN client can fake. Never expose the dev servers beyond localhost (no `vite --host`, no `wrangler dev --ip 0.0.0.0`, no tunnels) while `.dev.vars` contains `ACCESS_DEV_IDENTITY`, and never set `ACCESS_DEV_IDENTITY` as a Cloudflare dashboard variable or secret. Local dev is for the laptop only; test on phones and the TV through the Access-protected preview URL.
+
+Local D1 state is keyed by `database_id`. After a fresh clone, or if the id in `wrangler.jsonc` changes, run `pnpm --filter @table-forge/worker exec wrangler d1 migrations apply DB --local` and then `pnpm import:open5e`.
+
+Without the file, `pnpm dev` runs but every `/api` route except `/api/health` returns 401.
+
+## Deploying
+
+Cloudflare Workers Builds (Git integration) deploys; GitHub Actions only checks and holds no Cloudflare tokens. Merging to `main` is the production deploy.
+
+- **Access** protects the whole site (production and previews) with an email allow-list. The Worker also verifies the Access JWT on every `/api` route except `/api/health` (config in `vars`: `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`; not secrets). Missing config makes the Worker refuse everything.
+- **Two databases.** Production uses D1 `table-forge` (`apps/worker/wrangler.jsonc`). Preview branches use D1 `table-forge-staging`, declared in the `previews` block of the same `wrangler.jsonc` (Worker Previews take their bindings only from that block, never from the production bindings). Preview URLs look like `<branch>-table-forge.garyljw.workers.dev`, which stays under the Access-protected `*-table-forge.garyljw.workers.dev` hostname. `apps/worker/wrangler.staging.jsonc` exists only so `d1 migrations apply` can reach staging (it reads top-level `d1_databases` only). A test fails if the previews database is not staging, if production ids leak into previews, or if the vars drift.
+
+Dashboard settings (Workers & Pages, table-forge, Settings, Builds):
 
 | Setting | Value |
 |---|---|
 | Root directory | `/` (the repo root) |
-| Build command | `pnpm build` |
-| Deploy command (production, `main`) | `pnpm --filter @table-forge/worker exec wrangler deploy` |
-| Non-production deploy command (preview branches) | `pnpm --filter @table-forge/worker exec wrangler versions upload` |
+| Build command | `pnpm install --frozen-lockfile && pnpm build` (the only place the web app is built) |
+| Deploy command (production, `main`) | `pnpm deploy:prod` |
+| Non-production branch deploy command | `pnpm deploy:preview` |
+| Previews (open beta) tab, Preview command | `pnpm deploy:preview` |
 
-The Worker's name in the dashboard must be `table-forge` (it matches `apps/worker/wrangler.jsonc`).
+`deploy:prod` and `deploy:preview` are for Workers Builds only, and run after the Build command (they do not build). Each applies the D1 migrations to the right database (`wrangler d1 migrations apply DB --remote`) and then deploys (`wrangler deploy`) or creates or updates the branch's Preview (`wrangler preview --ignore-base-config`, which ignores any dashboard Preview base config so only the `previews` block applies). The build token needs D1 edit permission as well as Workers edit.
+
+Things to know:
+
+- Migrations run before the new code goes live, so each one must be backward-compatible with the previous Worker version.
+- All previews share the one staging database. It may carry schema from an unmerged branch, and it must never hold real data.
+
+Loading rules data into a remote database (run by Claude, deliberately explicit):
+
+```sh
+pnpm import:open5e --remote --target=staging
+pnpm import:open5e --remote --target=production --confirm-production
+```
+
+Local runs (`pnpm import:open5e`) keep using the local database.
 
 ## Content and licensing
 
