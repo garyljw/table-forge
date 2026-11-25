@@ -1,4 +1,18 @@
-import { RULE_TABLES, type ClassDetail, type Condition, type LicenseText, type Monster, type RuleTable, type SourceDocument, type Spell } from "@table-forge/shared";
+import {
+  RULE_TABLES,
+  type Armor,
+  type Background,
+  type ClassDetail,
+  type Condition,
+  type Feat,
+  type LicenseText,
+  type Monster,
+  type RuleTable,
+  type SourceDocument,
+  type Species,
+  type Spell,
+  type Weapon,
+} from "@table-forge/shared";
 import { foldName } from "../fold.js";
 
 /**
@@ -22,6 +36,11 @@ export interface ImportBundle {
   monsters: Monster[];
   classes: ClassDetail[];
   conditions: Condition[];
+  species: Species[];
+  backgrounds: Background[];
+  feats: Feat[];
+  weapons: Weapon[];
+  armor: Armor[];
 }
 
 /** D1 rejects statements over 100 KB. */
@@ -187,6 +206,95 @@ export function conditionStatement(c: Condition, run: string): string {
   );
 }
 
+export function speciesStatement(s: Species, run: string): string {
+  return recordUpsert(
+    "species",
+    s.documentKey,
+    [
+      ["id", sqlText(s.id)],
+      ["document_key", sqlText(s.documentKey)],
+      ["name", sqlText(s.name)],
+      ["name_search", sqlText(foldName(s.name))],
+      ["parent_id", sqlNullableText(s.parentSpecies?.id ?? null)],
+      ["parent_name", sqlNullableText(s.parentSpecies?.name ?? null)],
+      ["data", json(s)],
+    ],
+    run,
+  );
+}
+
+export function backgroundStatement(b: Background, run: string): string {
+  return recordUpsert(
+    "backgrounds",
+    b.documentKey,
+    [
+      ["id", sqlText(b.id)],
+      ["document_key", sqlText(b.documentKey)],
+      ["name", sqlText(b.name)],
+      ["name_search", sqlText(foldName(b.name))],
+      ["data", json(b)],
+    ],
+    run,
+  );
+}
+
+export function featStatement(f: Feat, run: string): string {
+  return recordUpsert(
+    "feats",
+    f.documentKey,
+    [
+      ["id", sqlText(f.id)],
+      ["document_key", sqlText(f.documentKey)],
+      ["name", sqlText(f.name)],
+      ["name_search", sqlText(foldName(f.name))],
+      ["prerequisite", sqlNullableText(f.prerequisite)],
+      ["data", json(f)],
+    ],
+    run,
+  );
+}
+
+export function weaponStatement(w: Weapon, run: string): string {
+  return recordUpsert(
+    "weapons",
+    w.documentKey,
+    [
+      ["id", sqlText(w.id)],
+      ["document_key", sqlText(w.documentKey)],
+      ["name", sqlText(w.name)],
+      ["name_search", sqlText(foldName(w.name))],
+      ["category", sqlText(w.category)],
+      ["kind", sqlText(w.kind)],
+      ["damage_dice", sqlText(w.damageDice)],
+      ["damage_type", sqlNullableText(w.damageType)],
+      ["data", json(w)],
+    ],
+    run,
+  );
+}
+
+export function armorStatement(a: Armor, run: string): string {
+  return recordUpsert(
+    "armor",
+    a.documentKey,
+    [
+      ["id", sqlText(a.id)],
+      ["document_key", sqlText(a.documentKey)],
+      ["name", sqlText(a.name)],
+      ["name_search", sqlText(foldName(a.name))],
+      ["category", sqlText(a.category)],
+      ["ac_base", sqlInt(a.acBase)],
+      ["adds_dex_modifier", sqlBool(a.addsDexModifier)],
+      ["dex_modifier_cap", a.dexModifierCap === null ? "NULL" : sqlInt(a.dexModifierCap)],
+      ["strength_required", a.strengthRequired === null ? "NULL" : sqlInt(a.strengthRequired)],
+      ["stealth_disadvantage", sqlBool(a.stealthDisadvantage)],
+      ["ac_display", sqlText(a.acDisplay)],
+      ["data", json(a)],
+    ],
+    run,
+  );
+}
+
 /** Deletes Open5e rows that this run did not stamp. Always the last statements of an import. */
 export function staleRowStatements(run: string): string[] {
   const stale = `import_run IS NOT ${sqlText(run)}`;
@@ -215,6 +323,11 @@ export function buildImportStatements(bundle: ImportBundle, run: string): string
     ...bundle.monsters.map((m) => monsterStatement(m, run)),
     ...bundle.classes.map((c) => classStatement(c, run)),
     ...bundle.conditions.map((c) => conditionStatement(c, run)),
+    ...bundle.species.map((x) => speciesStatement(x, run)),
+    ...bundle.backgrounds.map((x) => backgroundStatement(x, run)),
+    ...bundle.feats.map((x) => featStatement(x, run)),
+    ...bundle.weapons.map((x) => weaponStatement(x, run)),
+    ...bundle.armor.map((x) => armorStatement(x, run)),
     ...staleRowStatements(run),
   ];
 }

@@ -1,7 +1,7 @@
 import { staleRowStatements } from "@table-forge/core";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { monster, openBundle, runStatements, SEED, seedRules, spell } from "./seed.js";
+import { monster, openBundle, runStatements, SEED, seedRules, species, spell } from "./seed.js";
 
 const ids = async (table: string): Promise<string[]> =>
   ((await env.DB.prepare(`SELECT id FROM ${table} ORDER BY id`).all()).results as { id: string }[]).map((r) => r.id);
@@ -34,10 +34,31 @@ describe("Open5e import SQL", () => {
   });
 
   it("never touches rows of private documents", async () => {
-    await runStatements(openBundle("run-2", { spells: [], monsters: [], classes: [], conditions: [] }));
+    await runStatements(openBundle("run-2", { spells: [], monsters: [], classes: [], conditions: [], species: [], backgrounds: [], feats: [], weapons: [], armor: [] }));
     expect(await ids("spells")).toEqual(["secret_hidden-spell"]);
     expect(await ids("monsters")).toEqual(["secret_hidden-beast"]);
     expect(await ids("classes")).toEqual(["secret_hidden-subclass"]);
+    expect(await ids("species")).toEqual(["secret_hidden-elf", "secret_hidden-species"]);
+    expect(await ids("backgrounds")).toEqual(["secret_hidden-background"]);
+    expect(await ids("feats")).toEqual(["secret_hidden-feat"]);
+    expect(await ids("weapons")).toEqual(["secret_hidden-blade"]);
+    expect(await ids("armor")).toEqual(["secret_hidden-plate"]);
+  });
+
+  it("is idempotent for the character option tables, and removes vanished rows", async () => {
+    const before = { species: await ids("species"), weapons: await ids("weapons"), armor: await ids("armor") };
+    await runStatements(openBundle("run-2"));
+    await runStatements(openBundle("run-3"));
+    expect({ species: await ids("species"), weapons: await ids("weapons"), armor: await ids("armor") }).toEqual(before);
+    await runStatements(openBundle("run-4", { species: SEED.species.filter((x) => x.id === "srd_elf"), armor: [] }));
+    expect(await ids("species")).toEqual(["secret_hidden-elf", "secret_hidden-species", "srd_elf"]);
+    expect(await ids("armor")).toEqual(["secret_hidden-plate"]);
+  });
+
+  it("skips a species whose id belongs to a private row", async () => {
+    await runStatements(openBundle("run-2", { species: [species("secret_hidden-species", "Overwritten", { documentKey: "srd-2014" })] }));
+    const row = await env.DB.prepare("SELECT name, document_key, import_run FROM species WHERE id = 'secret_hidden-species'").first<Record<string, string | null>>();
+    expect(row).toEqual({ name: "Hidden Species", document_key: "secret-book", import_run: null });
   });
 
   it("skips an Open5e record whose id belongs to a private row, instead of overwriting it", async () => {

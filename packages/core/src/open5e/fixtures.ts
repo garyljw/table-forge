@@ -1,6 +1,6 @@
 // Small hand-written fixtures modelled on Open5e v2 responses. SRD 5.1 text only
 // (CC-BY-4.0); "Test Wyrm" is invented to cover the fields the SRD records lack.
-import type { RawClass, RawCondition, RawCreature, RawDocument, RawSpell } from "./raw.js";
+import type { RawArmor, RawBackground, RawClass, RawCondition, RawCreature, RawDocument, RawFeat, RawSpecies, RawSpell, RawWeapon } from "./raw.js";
 
 export const srdDocument: RawDocument = {
   key: "srd-2014",
@@ -214,4 +214,141 @@ export const blinded: RawCondition = {
     { desc: "* A blinded creature can't see and automatically fails any ability check that requires sight.\r\n* Attack rolls against the creature have advantage.", document: "srd-2014", gamesystem: "5e-2014" },
     { desc: "While you have the Blinded condition...", document: "srd-2024", gamesystem: "5e-2024" },
   ],
+};
+
+const srdRef = { key: "srd-2014", name: "System Reference Document 5.1", gamesystem: { key: "5e-2014" } };
+
+export const elf: RawSpecies = {
+  key: "srd_elf",
+  name: "Elf",
+  document: srdRef,
+  desc: "Elves are a magical people.\r\n",
+  is_subspecies: false,
+  subspecies_of: null,
+  traits: [
+    { name: "Darkvision", desc: "**_Darkvision._** You can see in dim light within 60 feet.", type: null },
+    { name: "Fey Ancestry", desc: "Advantage on saving throws against being charmed.", type: null },
+  ],
+};
+
+export const highElf: RawSpecies = {
+  key: "srd_high-elf",
+  name: "High Elf",
+  document: srdRef,
+  desc: "",
+  is_subspecies: true,
+  subspecies_of: "srd_elf",
+  traits: [{ name: "Ability Score Increase", desc: "Your Intelligence score increases by 1.", type: null }],
+};
+
+export const acolyte: RawBackground = {
+  key: "srd_acolyte",
+  name: "Acolyte",
+  document: srdRef,
+  desc: "You have spent your life in service to a temple.",
+  benefits: [
+    { name: "Shelter of the Faithful", desc: "You command the respect of those who share your faith.", type: "feature" },
+    { name: "Skill Proficiencies", desc: "Insight, Religion", type: "skill_proficiency" },
+  ],
+};
+
+export const grappler: RawFeat = {
+  key: "srd_grappler",
+  name: "Grappler",
+  document: srdRef,
+  desc: "You've developed the skills necessary to hold your own in close-quarters grappling.",
+  has_prerequisite: true,
+  prerequisite: "Strength 13 or higher",
+  type: "GENERAL",
+  benefits: [{ desc: "You have advantage on attack rolls against a creature you are grappling." }, { desc: "" }],
+};
+
+const weapon = (over: Partial<RawWeapon> & Pick<RawWeapon, "key" | "name">): RawWeapon => ({
+  document: srdRef,
+  damage_dice: "1d8",
+  damage_type: { key: "slashing", name: "Slashing" },
+  properties: [],
+  range: 0,
+  long_range: 0,
+  distance_unit: "feet",
+  is_simple: false,
+  is_improvised: false,
+  ...over,
+});
+
+export const longsword = weapon({
+  key: "srd_longsword",
+  name: "Longsword",
+  properties: [{ property: { name: "Versatile", type: null, desc: "Two-handed damage in parentheses." }, detail: "1d10" }],
+});
+export const shortbow = weapon({
+  key: "srd_shortbow",
+  name: "Shortbow",
+  is_simple: true,
+  damage_dice: "1d6",
+  damage_type: { key: "piercing", name: "Piercing" },
+  range: 80,
+  long_range: 320,
+  properties: [
+    { property: { name: "Ammunition", type: null, desc: "Needs ammunition." }, detail: "range 80/320" },
+    { property: { name: "Two-Handed", type: null, desc: "Two hands." }, detail: null },
+  ],
+});
+export const dagger = weapon({
+  key: "srd_dagger",
+  name: "Dagger",
+  is_simple: true,
+  damage_dice: "1d4",
+  damage_type: { key: "piercing", name: "Piercing" },
+  range: 20,
+  long_range: 60,
+  properties: [
+    { property: { name: "Finesse", type: null, desc: "Str or Dex." }, detail: null },
+    { property: { name: "Thrown", type: null, desc: "Can be thrown." }, detail: "range 20/60" },
+  ],
+});
+export const dart = weapon({
+  key: "srd_dart",
+  name: "Dart",
+  is_simple: true,
+  damage_dice: "1d4",
+  damage_type: { key: "piercing", name: "Piercing" },
+  range: 20,
+  long_range: 60,
+  properties: [{ property: { name: "Thrown", type: null, desc: "Can be thrown." }, detail: "range 20/60" }],
+});
+export const heavyCrossbow = weapon({
+  key: "srd_crossbow-heavy",
+  name: "Crossbow, heavy",
+  damage_dice: "1d10",
+  damage_type: { key: "piercing", name: "Piercing" },
+  range: 100,
+  long_range: 400,
+  properties: [{ property: { name: "Loading", type: null, desc: "One attack per action." }, detail: null }],
+});
+
+export const chainMail: RawArmor = {
+  key: "srd_chain-mail",
+  name: "Chain Mail",
+  document: srdRef,
+  ac_display: "16",
+  category: "heavy",
+  grants_stealth_disadvantage: true,
+  strength_score_required: 13,
+  ac_base: 16,
+  ac_add_dexmod: false,
+  ac_cap_dexmod: null,
+};
+
+export const breastplate: RawArmor = {
+  key: "srd_breastplate",
+  name: "Breastplate",
+  document: srdRef,
+  ac_display: "14 + Dex modifier (max 2)",
+  category: "medium",
+  grants_stealth_disadvantage: false,
+  strength_score_required: null,
+  ac_base: 14,
+  ac_add_dexmod: true,
+  ac_cap_dexmod: 2,
 };

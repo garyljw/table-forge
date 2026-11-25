@@ -87,13 +87,20 @@ export async function selectDetail(
   return row ? { data: JSON.parse(row.data), document: JSON.parse(row.document) } : null;
 }
 
-/** Every public class whose parent is `parentId`, with no paging (a class has a few dozen subclasses). */
-export async function selectChildClasses<Row>(db: D1Database, columns: string, parentId: string): Promise<Row[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT ${columns} FROM classes t JOIN documents d ON d.key = t.document_key WHERE d.visibility = 'public' AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
-    )
-    .bind(parentId)
-    .all<Row>();
+export type ChildTable = "classes" | "species";
+
+/** Fixed query text per table: the table name is never taken from the caller. `columns` is written in this codebase. */
+const CHILD_QUERIES: Record<ChildTable, (columns: string) => string> = {
+  classes: (columns) =>
+    `SELECT ${columns} FROM classes t JOIN documents d ON d.key = t.document_key WHERE d.visibility = 'public' AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
+  species: (columns) =>
+    `SELECT ${columns} FROM species t JOIN documents d ON d.key = t.document_key WHERE d.visibility = 'public' AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
+};
+
+/** Every public record of `table` whose parent is `parentId`, with no paging (a class or species has a few dozen children). */
+export async function selectChildren<Row>(db: D1Database, table: ChildTable, columns: string, parentId: string): Promise<Row[]> {
+  const sql = CHILD_QUERIES[table];
+  if (sql === undefined) throw new Error(`no children query for table "${String(table)}"`);
+  const { results } = await db.prepare(sql(columns)).bind(parentId).all<Row>();
   return results;
 }

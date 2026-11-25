@@ -69,3 +69,8 @@ export function safeHttpUrl(url: string | null | undefined): string | null {
 export function keyOptions(keys: string[]): { value: string; label: string }[] {
   return keys.map((k) => ({ value: k, label: titleKey(k) }));
 }
+
+/** "1d8 slashing", or "—" for a weapon that deals no damage (a net: dice "0") or has no damage type. */
+export function weaponDamageLabel(damageDice: string, damageType: string | null): string {
+  return damageType === null || damageDice.trim() === "0" ? "—" : `${damageDice} ${damageType}`;
+}

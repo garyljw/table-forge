@@ -30,19 +30,30 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  armorStatement,
+  backgroundStatement,
   checkImport,
   classStatement,
   conditionStatement,
   countStampedStatement,
   documentStatement,
+  featStatement,
   isDocumentIncluded,
   isStatementTooLarge,
   licenseStatement,
   monsterStatement,
   normaliseLicense,
+  speciesStatement,
   spellStatement,
   staleRowStatements,
+  weaponStatement,
+  normaliseArmor,
+  normaliseBackground,
   normaliseClass,
+  normaliseFeat,
+  normaliseSpecies,
+  normaliseWeapon,
+  resolveSpeciesParents,
   resolveSubclassParents,
   normaliseConditions,
   normaliseDocument,
@@ -50,14 +61,19 @@ import {
   normaliseSpell,
   OPEN5E_API_BASE,
   OPEN5E_CONTENT_RULES,
+  type RawArmor,
+  type RawBackground,
   type RawClass,
   type RawCondition,
   type RawCreature,
   type RawDocument,
+  type RawFeat,
   type RawLicense,
+  type RawSpecies,
   type RawSpell,
+  type RawWeapon,
 } from "@table-forge/core";
-import { RULE_TABLES, ClassDetail, Condition, LicenseText, Monster, SourceDocument, Spell } from "@table-forge/shared";
+import { RULE_TABLES, Armor, Background, ClassDetail, Condition, Feat, LicenseText, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workerDir = path.join(root, "apps/worker");
@@ -212,7 +228,17 @@ async function main(): Promise<void> {
   for (const d of excluded) console.log(`  - ${d.key.padEnd(24)} ${d.gamesystem.key.padEnd(8)} ${d.name}`);
   const includedKeys = new Set(included.map((d) => d.key));
 
-  const stats = { spells: newStats(), monsters: newStats(), classes: newStats(), conditions: newStats() };
+  const stats = {
+    spells: newStats(),
+    monsters: newStats(),
+    classes: newStats(),
+    conditions: newStats(),
+    species: newStats(),
+    backgrounds: newStats(),
+    feats: newStats(),
+    weapons: newStats(),
+    armor: newStats(),
+  };
   console.log("");
 
   const rawSpells: RawSpell[] = [];
@@ -227,6 +253,14 @@ async function main(): Promise<void> {
   // Conditions are one record per condition with a description per document, so fetch them all
   // and let the normaliser keep the descriptions from included documents.
   const rawConditions = await fetchAll<RawCondition>("conditions");
+  // The character option endpoints are fetched whole, then kept by document: Open5e ignores the
+  // document filters on some of them (weapons returns the 2024 rules alongside the 2014 ones).
+  const ofIncluded = <T extends { document: { key: string } }>(all: T[]): T[] => all.filter((r) => includedKeys.has(r.document.key));
+  const rawSpecies = ofIncluded(await fetchAll<RawSpecies>("species"));
+  const rawBackgrounds = ofIncluded(await fetchAll<RawBackground>("backgrounds"));
+  const rawFeats = ofIncluded(await fetchAll<RawFeat>("feats"));
+  const rawWeapons = ofIncluded(await fetchAll<RawWeapon>("weapons"));
+  const rawArmor = ofIncluded(await fetchAll<RawArmor>("armor"));
 
   const spells = convert("spells", rawSpells, stats.spells, (r) => [normaliseSpell(r)], Spell, (r) => spellStatement(r, run), includedKeys);
   const monsters = convert("monsters", rawCreatures, stats.monsters, (r) => [normaliseMonster(r)], Monster, (r) => monsterStatement(r, run), includedKeys);
@@ -267,6 +301,42 @@ async function main(): Promise<void> {
     includedKeys,
   );
 
+  // Keyed by the raw record's key. As with subclasses, a subspecies's parent must be a species we store.
+  const normalisedSpecies = new Map<string, Species | Error>();
+  for (const r of rawSpecies) {
+    try {
+      normalisedSpecies.set(r.key, normaliseSpecies(r));
+    } catch (err) {
+      normalisedSpecies.set(r.key, err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+  const okSpecies = [...normalisedSpecies.values()].filter((x): x is Species => !(x instanceof Error));
+  const failedSpeciesIds = new Set(rawSpecies.filter((r) => normalisedSpecies.get(r.key) instanceof Error).map((r) => r.key));
+  const resolvedSpecies = resolveSpeciesParents(okSpecies, failedSpeciesIds);
+  const resolvedById = new Map(resolvedSpecies.species.map((x) => [x.id, x]));
+  for (const [rawKey, x] of normalisedSpecies) {
+    if (!(x instanceof Error)) normalisedSpecies.set(rawKey, resolvedById.get(x.id) ?? x);
+  }
+  const species = convert(
+    "species",
+    rawSpecies,
+    stats.species,
+    (r) => {
+      const x = normalisedSpecies.get(r.key);
+      if (x instanceof Error) throw x;
+      return x ? [x] : [];
+    },
+    Species,
+    (r) => speciesStatement(r, run),
+    includedKeys,
+  );
+  console.log(`Subspecies parents: ${resolvedSpecies.unresolved.length} unresolved (kept as subspecies, parent shown as text)`);
+  for (const u of resolvedSpecies.unresolved) console.log(`  unresolved: ${u.species.id} (${u.species.name}) wanted parent "${u.species.parentSpecies?.name ?? "?"}": ${u.reason}`);
+  const backgrounds = convert("backgrounds", rawBackgrounds, stats.backgrounds, (r) => [normaliseBackground(r)], Background, (r) => backgroundStatement(r, run), includedKeys);
+  const feats = convert("feats", rawFeats, stats.feats, (r) => [normaliseFeat(r)], Feat, (r) => featStatement(r, run), includedKeys);
+  const weapons = convert("weapons", rawWeapons, stats.weapons, (r) => [normaliseWeapon(r)], Weapon, (r) => weaponStatement(r, run), includedKeys);
+  const armor = convert("armor", rawArmor, stats.armor, (r) => [normaliseArmor(r)], Armor, (r) => armorStatement(r, run), includedKeys);
+
   const whereArgs = remote ? ["--remote", "--config", targetConfig] : ["--local"];
   const where = remote ? `REMOTE ${target}` : "local";
   /** Runs one SELECT with `wrangler d1 execute --json` and returns its first row. Throws if the output is not as expected. */
@@ -302,7 +372,17 @@ async function main(): Promise<void> {
     for (const t of RULE_TABLES) if (typeof existing[t] !== "number") throw new Error(`could not read the existing ${t} count from D1`);
   }
   const problems = checkImport(
-    { spells: summary(stats.spells), monsters: summary(stats.monsters), classes: summary(stats.classes), conditions: summary(stats.conditions) },
+    {
+      spells: summary(stats.spells),
+      monsters: summary(stats.monsters),
+      classes: summary(stats.classes),
+      conditions: summary(stats.conditions),
+      species: summary(stats.species),
+      backgrounds: summary(stats.backgrounds),
+      feats: summary(stats.feats),
+      weapons: summary(stats.weapons),
+      armor: summary(stats.armor),
+    },
     existing,
     { maxFailureRate: 0.05, maxDropRate: 0.2, force },
   );
@@ -313,7 +393,7 @@ async function main(): Promise<void> {
   }
 
   // Only documents that actually supply a record are stored (and credited).
-  const used = new Set([...spells, ...monsters, ...classes, ...conditions].map((c) => c.record.documentKey));
+  const used = new Set([...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor].map((c) => c.record.documentKey));
   const documents = included
     .filter((d) => used.has(d.key))
     .map((d) => {
@@ -334,7 +414,7 @@ async function main(): Promise<void> {
   const statements = [
     ...documents.map((d) => d.statement),
     ...licenses.map((l) => l.statement),
-    ...[...spells, ...monsters, ...classes, ...conditions].map((c) => c.statement),
+    ...[...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor].map((c) => c.statement),
     ...staleRowStatements(run),
   ];
   mkdirSync(outDir, { recursive: true });
@@ -342,10 +422,11 @@ async function main(): Promise<void> {
   writeFileSync(sqlFile, statements.join("\n") + "\n");
   console.log(`\nWrote ${statements.length} statements to ${path.relative(root, sqlFile)} (run ${run})`);
 
-  console.log("\nCounts per document (spells / monsters / classes / conditions):");
+  console.log("\nCounts per document (spells / monsters / classes / conditions / species / backgrounds / feats / weapons / armor):");
   for (const d of documents) {
     const n = (s: Stats) => s.byDocument.get(d.record.key) ?? 0;
-    console.log(`  ${d.record.key.padEnd(24)} ${n(stats.spells)} / ${n(stats.monsters)} / ${n(stats.classes)} / ${n(stats.conditions)}`);
+    const row = [stats.spells, stats.monsters, stats.classes, stats.conditions, stats.species, stats.backgrounds, stats.feats, stats.weapons, stats.armor].map(n);
+    console.log(`  ${d.record.key.padEnd(24)} ${row.join(" / ")}`);
   }
   console.log("\nValidation failures:");
   for (const [type, s] of Object.entries(stats)) {
@@ -359,7 +440,14 @@ async function main(): Promise<void> {
 
   // Upserts that were skipped (an id or document belonging to a private/homebrew row) leave rows without this run's marker.
   const stamped = d1Row(countStampedStatement(run));
-  const expected = { documents: documents.length, licenses: licenses.length, spells: spells.length, monsters: monsters.length, classes: classes.length, conditions: conditions.length };
+  const expected = { documents: documents.length, licenses: licenses.length, spells: spells.length, monsters: monsters.length, classes: classes.length,
+    conditions: conditions.length,
+    species: species.length,
+    backgrounds: backgrounds.length,
+    feats: feats.length,
+    weapons: weapons.length,
+    armor: armor.length,
+  };
   let skipped = 0;
   for (const [table, want] of Object.entries(expected)) {
     const diff = want - (stamped[table] ?? 0);

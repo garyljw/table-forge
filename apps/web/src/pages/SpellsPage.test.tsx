@@ -17,7 +17,7 @@ beforeEach(() => {
     vi.fn(async (input: string) => {
       urls.push(String(input));
       const body = String(input).startsWith("/api/rules/documents")
-        ? { items: [{ ...SRD_DOCUMENT, counts: { spells: 3, monsters: 0, classes: 0, conditions: 0 } }] }
+        ? { items: [{ ...SRD_DOCUMENT, counts: { spells: 3, monsters: 0, classes: 0, conditions: 0, species: 0, backgrounds: 0, feats: 0, weapons: 0, armor: 0 } }] }
         : {
             items: [
               { id: "srd_fireball", documentKey: "srd-2014", name: "Fireball", level: 3, school: "evocation", classes: ["sorcerer", "wizard"], concentration: false, ritual: false, castingTime: "action", range: "150 feet" },

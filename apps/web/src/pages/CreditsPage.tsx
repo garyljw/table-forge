@@ -14,6 +14,11 @@ function counts(c: Doc["counts"]): string {
       ["monsters", c.monsters],
       ["classes", c.classes],
       ["conditions", c.conditions],
+      ["species", c.species],
+      ["backgrounds", c.backgrounds],
+      ["feats", c.feats],
+      ["weapons", c.weapons],
+      ["armor", c.armor],
     ] as const
   )
     .filter(([, n]) => n > 0)
