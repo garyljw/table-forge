@@ -94,8 +94,8 @@ Any change touching these needs Sonnet and a `/security-review`:
 ## Repositories and data
 | Location | Visibility | Contents |
 |---|---|---|
-| `~/code/table-forge` (GitHub `table-forge`) | **Public** | App code, import and validation scripts, schemas. **No book content and no owner maps.** |
-| `~/code/table-forge-data` (GitHub `table-forge-data`) | **Private** | JSON transcribed from the owner's books, plus homebrew |
+| `~/code/table-forge` (GitHub `table-forge`) | **Public** | App code, the Open5e import, schemas. **No book content and no owner maps.** |
+| `~/code/table-forge-data` (GitHub `table-forge-data`) | **Private** | JSON transcribed from the owner's books, plus homebrew. The book-data scripts (page extraction, inventory, validation, private import), which link to `@table-forge/shared` and `@table-forge/core` from `../table-forge` so they use the same schemas. Code changes here follow the same review rules as the public repo, and the import path is a high-security area. |
 | Private R2 bucket, or the owner's cloud drive | Private | Book scan images. These are **never stored in git.** |
 
 - **Copyright rule:** non-SRD book content must never be committed to the public repo, and must never be served to anyone who isn't an authenticated, invited user.
@@ -121,7 +121,7 @@ All three must be normalised into **one internal schema**, modelled on Open5e's 
    Anything inconsistent is flagged for the owner to check against the book.
 4. An import script loads the data into D1: local first, then staging, then production. Private book data may go into staging, because previews are behind the same Access allow-list as production. If previews ever become reachable without Access, remove it from staging first.
 
-Transcribe on demand: only content the table actually needs that Open5e lacks.
+Transcribe **everything** from the owner's 2014 PHB, DMG and Monster Manual that Open5e's SRD 5.1 lacks. Where an entry is in the SRD, the SRD version is used and the book entry is skipped. Order: Monster Manual monsters; PHB spells, feats, backgrounds, subclasses and races; DMG magic items; then the rest of the DMG (tables and optional rules), which needs new record types first.
 
 ### Backups
 - Transcribed JSON is kept in the private git repo.
