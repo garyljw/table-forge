@@ -38,6 +38,16 @@ export const MonsterFeature = z.object({
 });
 export type MonsterFeature = z.infer<typeof MonsterFeature>;
 
+/**
+ * A lair actions or regional effects block: an intro paragraph (may be empty) and the
+ * entries under it. `legendaryCost` and `usage` are normally null on these entries.
+ */
+export const MonsterLairSection = z.object({
+  description: z.string(),
+  items: z.array(MonsterFeature),
+});
+export type MonsterLairSection = z.infer<typeof MonsterLairSection>;
+
 export const MonsterSummary = z.object({
   id: RecordId,
   documentKey: DocumentKey,
@@ -87,5 +97,11 @@ export const Monster = MonsterSummary.extend({
   bonusActions: z.array(MonsterFeature),
   reactions: z.array(MonsterFeature),
   legendaryActions: z.array(MonsterFeature),
+  /**
+   * Lair actions and regional effects, or null when the creature has none. Both default to
+   * null so monster rows imported before these fields existed still validate.
+   */
+  lairActions: MonsterLairSection.nullable().default(null),
+  regionalEffects: MonsterLairSection.nullable().default(null),
 });
 export type Monster = z.infer<typeof Monster>;

@@ -31,6 +31,8 @@ export const goblin: Monster = {
   bonusActions: [],
   reactions: [],
   legendaryActions: [],
+  lairActions: null,
+  regionalEffects: null,
 };
 
 export const SRD_DOCUMENT = {

@@ -1,4 +1,4 @@
-import type { Monster, MonsterFeature } from "@table-forge/shared";
+import type { Monster, MonsterFeature, MonsterLairSection } from "@table-forge/shared";
 import { abilityModifier } from "@table-forge/core";
 import { capitalise, safeCr, signed, titleKey } from "../format.js";
 import { Markdown } from "./Markdown.js";
@@ -74,6 +74,18 @@ function Features({ title, items }: { title?: string; items: MonsterFeature[] })
   );
 }
 
+/** Lair actions or regional effects: a heading, the intro text, then the entries. */
+function LairSection({ title, section }: { title: string; section: MonsterLairSection | null }) {
+  if (section === null || (section.description === "" && section.items.length === 0)) return null;
+  return (
+    <section className="features lair-section">
+      <h2>{title}</h2>
+      {section.description !== "" && <Markdown>{section.description}</Markdown>}
+      <Features items={section.items} />
+    </section>
+  );
+}
+
 function Line({ label, value }: { label: string; value: string }) {
   if (value === "") return null;
   return (
@@ -142,6 +154,8 @@ export function StatBlock({ monster: m }: { monster: Monster }) {
       <Features title="Bonus Actions" items={m.bonusActions} />
       <Features title="Reactions" items={m.reactions} />
       <Features title="Legendary Actions" items={m.legendaryActions} />
+      <LairSection title="Lair Actions" section={m.lairActions} />
+      <LairSection title="Regional Effects" section={m.regionalEffects} />
       {m.environments.length > 0 && <Line label="Environments" value={m.environments.join(", ")} />}
     </article>
   );

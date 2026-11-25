@@ -102,6 +102,8 @@ export function monster(id: string, name: string, over: Partial<Monster> = {}): 
     bonusActions: [],
     reactions: [],
     legendaryActions: [],
+    lairActions: null,
+    regionalEffects: null,
     ...over,
   };
 }

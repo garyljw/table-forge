@@ -109,6 +109,9 @@ describe("normaliseMonster", () => {
     expect(m.reactions.map((a) => a.name)).toEqual(["Parry"]);
     expect(m.damageResistances).toBe("bludgeoning from nonmagical attacks");
     expect(m.speed.hover).toBe(true);
+    // Open5e v2 supplies no lair data.
+    expect(m.lairActions).toBeNull();
+    expect(m.regionalEffects).toBeNull();
   });
   it("allows a missing hit dice formula", () => {
     expect(normaliseMonster(fx.wyrmWithoutHitDice).hitDice).toBeNull();
