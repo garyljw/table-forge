@@ -20,4 +20,10 @@ describe("SourceLine", () => {
     expect(screen.getByText(/owner's private copy/)).toBeTruthy();
     expect(screen.queryByText(/licence not stated/)).toBeNull();
   });
+
+  it("shows the licence names of a private document that has any", () => {
+    render(<SourceLine document={{ ...SRD_DOCUMENT, key: "kp", displayName: "Some Book", origin: "private", visibility: "private" }} />);
+    expect(screen.getByText(/Creative Commons Attribution 4.0/)).toBeTruthy();
+    expect(screen.queryByText(/owner's private copy/)).toBeNull();
+  });
 });

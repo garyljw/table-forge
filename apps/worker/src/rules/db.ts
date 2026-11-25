@@ -130,7 +130,7 @@ export async function selectChildren<Row>(db: D1Database, scope: DocumentScope, 
 export async function selectDocuments(db: D1Database, scope: DocumentScope) {
   const [docs, ...counts] = await db.batch([
     db.prepare(`SELECT d.data AS data FROM documents d WHERE ${visibilityClause(scope)} ORDER BY d.display_name COLLATE NOCASE, d.key`),
-    ...RULE_TABLES.map((t) => db.prepare(`SELECT document_key, COUNT(*) AS n FROM ${t} GROUP BY document_key`)),
+    ...RULE_TABLES.map((t) => db.prepare(`SELECT t.document_key AS document_key, COUNT(*) AS n FROM ${t} t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} GROUP BY t.document_key`)),
   ]);
   return { docs: docs?.results ?? [], counts };
 }

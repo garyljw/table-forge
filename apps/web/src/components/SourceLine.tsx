@@ -3,8 +3,9 @@ import { Link } from "wouter";
 
 /** "Source: <document> — <licence>", shown on every detail page and linking to the credits entry. */
 export function SourceLine({ document }: { document: SourceDocument }) {
-  // The owner's private books have no licence text; say what they are rather than "not stated".
-  const licence = document.visibility === "private" ? "owner's private copy" : document.licenses.map((l) => l.name).join(" / ") || "licence not stated";
+  // Show the licence names when there are any. A private book with none is the owner's own copy.
+  const names = document.licenses.map((l) => l.name).join(" / ");
+  const licence = names !== "" ? names : document.visibility === "private" ? "owner's private copy" : "licence not stated";
   return (
     <p className="source-line">
       Source:{" "}

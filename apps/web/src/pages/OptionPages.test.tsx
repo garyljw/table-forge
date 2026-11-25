@@ -2,7 +2,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetRulesCache } from "../api/rules.js";
 import { weaponDamageLabel } from "../format.js";
 import { SRD_DOCUMENT } from "../test-fixtures.js";
 import { SpeciesDetailPage } from "./DetailPages.js";
@@ -32,7 +31,6 @@ function body(url: string): unknown {
 
 beforeEach(() => {
   urls.length = 0;
-  resetRulesCache();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string) => {

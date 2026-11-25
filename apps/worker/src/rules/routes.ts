@@ -23,7 +23,7 @@ import {
   MonsterListQuery,
   MonsterListResponse,
   RecordId,
-    SourceDocument,
+  SourceDocument,
   SpeciesDetailResponse,
   SpeciesListQuery,
   SpeciesListResponse,
@@ -43,6 +43,13 @@ import { notFound, parseQuery } from "./query.js";
 
 /** `/api/rules/*`: the read-only rules browser. Mounted under `/api`, behind whatever auth middleware that gets. */
 export const rulesRoutes = new Hono<AppEnv>();
+
+// Responses depend on who is asking (private books are for signed-in users only), so no shared cache
+// or browser cache may keep one. Set after the handler so errors and 404s carry it too.
+rulesRoutes.use("*", async (c, next) => {
+  await next();
+  c.header("Cache-Control", "private, no-store");
+});
 
 interface SpellRow {
   id: string;

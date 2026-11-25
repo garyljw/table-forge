@@ -74,7 +74,23 @@ describe("a verified Access user", () => {
   });
 });
 
+describe("caching", () => {
+  it.each(["/spells", "/spells/secret_hidden-spell", "/spells/nope", "/documents", "/licenses"])("%s is private, no-store", async (path) => {
+    for (const caller of [USER, NO_IDENTITY]) {
+      const res = await getAs(caller, path);
+      expect(res.headers.get("cache-control")).toBe("private, no-store");
+    }
+  });
+});
+
 describe.each(DENIED)("%s", (_label, caller) => {
+  it("counts only public rows per document", async () => {
+    const docs = DocumentListResponse.parse(await (await getAs(caller, "/documents")).json());
+    const publicSpells = ((await (await getAs(caller, "/spells")).json()) as { total: number }).total;
+    expect(docs.items.reduce((n, d) => n + d.counts.spells, 0)).toBe(publicSpells);
+    expect(publicSpells).toBe(6);
+  });
+
   it.each(TABLES)("never sees private $path (list, search, filter, detail)", async ({ path, name, id }) => {
     expect(await names(caller, `/${path}`)).not.toContain(name);
     expect(await names(caller, `/${path}?q=hidden`)).toEqual([]);
