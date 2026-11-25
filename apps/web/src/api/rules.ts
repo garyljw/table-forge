@@ -1,18 +1,28 @@
 import {
+  ArmorDetailResponse,
+  ArmorListResponse,
+  BackgroundDetailResponse,
+  BackgroundListResponse,
   ClassDetailResponse,
   ClassListResponse,
   ConditionDetailResponse,
   ConditionListResponse,
   DocumentListResponse,
+  FeatDetailResponse,
+  FeatListResponse,
   LicenseListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
+  SpeciesDetailResponse,
+  SpeciesListResponse,
   SpellDetailResponse,
   SpellListResponse,
+  WeaponDetailResponse,
+  WeaponListResponse,
 } from "@table-forge/shared";
 import { apiGet, type QueryParams } from "./client.js";
 
-export type RuleKind = "spells" | "monsters" | "classes" | "conditions";
+export type RuleKind = "spells" | "monsters" | "classes" | "conditions" | "species" | "backgrounds" | "feats" | "weapons" | "armor";
 
 export const listSpells = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/spells", SpellListResponse, p, s);
 export const getSpell = (id: string, s?: AbortSignal) =>
@@ -28,6 +38,23 @@ export const listConditions = (p: QueryParams, s?: AbortSignal) =>
   apiGet("/api/rules/conditions", ConditionListResponse, p, s);
 export const getCondition = (id: string, s?: AbortSignal) =>
   apiGet(`/api/rules/conditions/${encodeURIComponent(id)}`, ConditionDetailResponse, {}, s);
+
+export const listSpecies = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/species", SpeciesListResponse, p, s);
+export const getSpecies = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/species/${encodeURIComponent(id)}`, SpeciesDetailResponse, {}, s);
+export const listBackgrounds = (p: QueryParams, s?: AbortSignal) =>
+  apiGet("/api/rules/backgrounds", BackgroundListResponse, p, s);
+export const getBackground = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/backgrounds/${encodeURIComponent(id)}`, BackgroundDetailResponse, {}, s);
+export const listFeats = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/feats", FeatListResponse, p, s);
+export const getFeat = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/feats/${encodeURIComponent(id)}`, FeatDetailResponse, {}, s);
+export const listWeapons = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/weapons", WeaponListResponse, p, s);
+export const getWeapon = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/weapons/${encodeURIComponent(id)}`, WeaponDetailResponse, {}, s);
+export const listArmor = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/armor", ArmorListResponse, p, s);
+export const getArmor = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/armor/${encodeURIComponent(id)}`, ArmorDetailResponse, {}, s);
 
 // Documents and licences hardly ever change, so one fetch per page load is plenty.
 let documentsPromise: ReturnType<typeof fetchDocuments> | null = null;

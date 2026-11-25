@@ -71,6 +71,14 @@ describe("routes", () => {
     expect((await authedFetch(SPELLS)).status).toBe(200);
   });
 
+  it("requires auth for every character option route, lists and details", async () => {
+    for (const path of ["species", "backgrounds", "feats", "weapons", "armor"]) {
+      expect((await withHeader(`https://example.com/api/rules/${path}`)).status).toBe(401);
+      expect((await withHeader(`https://example.com/api/rules/${path}/srd_x`)).status).toBe(401);
+      expect((await authedFetch(`https://example.com/api/rules/${path}`)).status).toBe(200);
+    }
+  });
+
   it("keeps the public list to health only, and protects a route added to the same app", async () => {
     expect(PUBLIC_API_PATHS).toEqual(["/api/health"]);
     // Hono freezes its router after the first request, so build a fresh app the way api.ts does.

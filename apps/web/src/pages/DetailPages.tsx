@@ -1,10 +1,11 @@
 import { Link } from "wouter";
-import { getClass, getMonster, getSpell } from "../api/rules.js";
+import { getArmor, getBackground, getClass, getFeat, getMonster, getSpecies, getSpell, getWeapon } from "../api/rules.js";
 import { ErrorNote, Loading } from "../components/States.js";
 import { SourceLine } from "../components/SourceLine.js";
 import { SpellCard } from "../components/SpellCard.js";
 import { StatBlock } from "../components/StatBlock.js";
 import { ClassView } from "../components/ClassView.js";
+import { ArmorView, BackgroundView, FeatView, SpeciesView, WeaponView } from "../components/OptionViews.js";
 import { useApi, type ApiState } from "../hooks/useApi.js";
 
 function DetailFrame<T>({
@@ -76,3 +77,83 @@ export function ClassDetailPage({ id }: { id: string }) {
   );
 }
 
+
+export function SpeciesDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getSpecies(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/races", label: "All races" }}
+      render={(r) => (
+        <>
+          <SpeciesView detail={r} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function BackgroundDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getBackground(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/backgrounds", label: "All backgrounds" }}
+      render={(r) => (
+        <>
+          <BackgroundView background={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function FeatDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getFeat(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/feats", label: "All feats" }}
+      render={(r) => (
+        <>
+          <FeatView feat={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function WeaponDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getWeapon(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/equipment", label: "All equipment" }}
+      render={(r) => (
+        <>
+          <WeaponView weapon={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function ArmorDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getArmor(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/equipment?tab=armor", label: "All equipment" }}
+      render={(r) => (
+        <>
+          <ArmorView armor={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}

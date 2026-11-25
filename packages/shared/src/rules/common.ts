@@ -22,5 +22,5 @@ export const NamedRef = z.object({ id: z.string().min(1), name: z.string().min(1
 export type NamedRef = z.infer<typeof NamedRef>;
 
 /** The record tables of the rules data. The one list every query and import statement works from. */
-export const RULE_TABLES = ["spells", "monsters", "classes", "conditions"] as const;
+export const RULE_TABLES = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor"] as const;
 export type RuleTable = (typeof RULE_TABLES)[number];
