@@ -95,7 +95,7 @@ Any change touching these needs Sonnet and a `/security-review`:
 | Location | Visibility | Contents |
 |---|---|---|
 | `~/code/table-forge` (GitHub `table-forge`) | **Public** | App code, the Open5e import, schemas. **No book content and no owner maps.** |
-| `~/code/table-forge-data` (GitHub `table-forge-data`) | **Private** | JSON transcribed from the owner's books, plus homebrew. The book-data scripts (page extraction, inventory, validation, private import), which link to `@table-forge/shared` and `@table-forge/core` from `../table-forge` so they use the same schemas. Code changes here follow the same review rules as the public repo, and the import path is a high-security area. |
+| `~/code/table-forge-data` (GitHub `table-forge-data`) | **Private** | JSON transcribed from the owner's books, plus homebrew. The book-data scripts (page extraction, inventory, validation, private import), which link to `@table-forge/shared` and `@table-forge/core` from `../table-forge` so they use the same schemas. Code changes here follow the same review rules as the public repo, and the import path is a high-security area. The owner's standing instruction: commit and push this repo **straight to `main`**, with no branches or PRs, after the reviews. |
 | Private R2 bucket, or the owner's cloud drive | Private | Book scan images. These are **never stored in git.** |
 
 - **Copyright rule:** non-SRD book content must never be committed to the public repo, and must never be served to anyone who isn't an authenticated, invited user.
