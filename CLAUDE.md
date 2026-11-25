@@ -33,7 +33,7 @@ The owner does not write code. Claude does all planning and coding. The owner re
 ### High-security areas
 Any change touching these needs Sonnet and a `/security-review`:
 - **Visibility filtering**: the code that decides what Display and Player connections receive. Hidden tokens, fog and DM notes must never reach them.
-- **Auth and identity**: Cloudflare Access integration, reading the Access JWT, role resolution (DM, Display, Player) and character ownership checks.
+- **Auth and identity**: Cloudflare Access integration, reading the Access JWT, role resolution (DM, Display, Player), character ownership checks, and game permissions (who is DM, sharing, DM transfer and reclaim, player-safe pages, character snapshots). See "Games, DMs and sharing".
 - **Display access**: the way the TV gets in without a personal login. This must be specified before it is built:
   - Prefer an Access service token, or a short-lived token the DM issues for one session only.
   - Tokens must be scoped to the Display role, revocable and expiring.
@@ -180,13 +180,45 @@ Changes to these fences (pnpm, tsconfig or lint configuration, the canary check,
 ### Roles
 | Role | Device | Can |
 |---|---|---|
-| **DM** | Laptop | See everything; control maps, fog, tokens and all characters; undo any action |
+| **DM** | Laptop | Within their own adventure: see everything; control maps, fog, tokens and the characters playing in it; undo any action |
 | **Display** | TV, over HDMI as a second monitor or via a spare laptop | View only. Fullscreen, no controls or cursor, follows the DM's camera, sees player-visible state only |
 | **Player** | Phones and laptops | Own characters only: edit the sheet, move their own token, use the ruler. Player-visible map state only |
 
 - Players are invited by email through Cloudflare Access, and Access handles login. No password system is built.
-- The app maps each Access identity to a role and the characters that player owns.
+- **Roles are per game, not global.** The app maps each Access identity to the characters it owns, and to its role in each campaign or adventure. Nobody is DM everywhere.
 - The Display view gets its own access path (a DM-issued display token or an Access service token) so the TV needs no personal login.
+
+### Games, DMs and sharing
+**Games.**
+- A **campaign** is a series of adventures played with the same characters.
+- A **standalone adventure** is a one-shot that belongs to no campaign.
+- Any invited user can create either kind.
+
+**Who is DM.**
+- **Each adventure has its own DM**, including adventures inside a campaign. Different people can DM different adventures of the same campaign.
+- **The creator starts as DM.** They can promote another player to DM instead.
+- **The creator can always reclaim DM**, even after transferring it.
+
+**Sharing.** An adventure is **private to its DM**. The DM can share it with any user, whether a player or another DM, at one of three levels:
+- **read-only**: can see the full DM view, but change nothing.
+- **edit**: can see and change it.
+- **transfer DM**: the recipient becomes the DM. The creator can still reclaim it.
+
+**Characters.**
+- A character belongs to its player. It is private to that player unless it is in a game.
+- A character can be in **several games at once**, for example a campaign plus one-shots. The DM of each of those adventures can see and manage it while it is playing there.
+- **When an adventure ends, each character in it is snapshotted.** The adventure's DM keeps read access to those snapshots, which show the character **as it was at the end of the adventure**, never its later state.
+
+**Player-safe pages.**
+- Everyone who has played in a campaign can see the **player-safe** campaign page and the player-safe pages of its adventures.
+- Everyone who played in a standalone adventure can see its player-safe page.
+- Player-safe pages never include DM notes, hidden content or anything else the server would filter from a Player connection.
+- Which fields of a campaign or adventure are player-safe must be defined explicitly in the `shared` schemas, as an allow-list rather than a block-list. The server builds the player-safe view from that list.
+
+**Enforcement.**
+- All of the above is enforced on the server, for every request and WebSocket message. Hiding things on the client is not enough.
+- Permission checks must tell apart: the creator, the current DM, edit sharers, read-only sharers, current and past players, and past DMs with snapshot-only access.
+- This is a **high-security area** (auth and identity). It needs thorough tests and a `/security-review`.
 
 ### Live sessions (Durable Objects)
 - **One Durable Object per game session.** It holds the true state and the WebSocket connections from every client.
@@ -257,7 +289,7 @@ Changes to these fences (pnpm, tsconfig or lint configuration, the canary check,
 3. **Live sync**: DM and Display roles, Durable Object session, event log and undo.
 4. **Fog of war and hidden tokens**, with server-side filtering and tests.
    - **4b. Lighting and effects, stage A**: lights on tokens and on the map, a darkness overlay, flicker, spell effects. Atmosphere only.
-5. **Character sheets**: the sheet that does the maths, then level-up and drafts.
+5. **Character sheets**: the sheet that does the maths, then level-up and drafts. Personal character storage comes first; campaigns, adventures, DMs and sharing (see "Games, DMs and sharing") follow.
 6. **Players**: Access logins, player phone view, moving own tokens.
 7. **Combat**: initiative, turn tracking, movement remaining, monster stat blocks on tokens.
 8. **Walls, line of sight and dynamic lighting (stage B)**: the scene editor (walls, doors, lights), `.dd2vtt` import/export, the Watabou importer, and server-computed vision for each character. Requires `/security-review`.
