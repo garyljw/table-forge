@@ -22,7 +22,11 @@ const RARITIES = new Set<string>(["common", "uncommon", "rare", "very-rare", "le
 /** `requires attunement by a Paladin` becomes `by a Paladin`; a bare `requires attunement` becomes null. */
 function attunementDetail(raw: RawMagicItem): string | null {
   if (raw.requires_attunement !== true) return null;
-  const detail = cleanText(raw.attunement_detail).replace(/^requires\s+attunement\b[\s:,-]*/i, "");
+  const detail = cleanText(raw.attunement_detail)
+    .replace(/^\((.*)\)$/s, "$1")
+    .trim()
+    .replace(/^requires\s+attunement\b[\s:,-]*/i, "")
+    .trim();
   return detail === "" ? null : detail;
 }
 

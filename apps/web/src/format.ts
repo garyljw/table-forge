@@ -75,6 +75,11 @@ export function weaponDamageLabel(damageDice: string, damageType: string | null)
   return damageType === null || damageDice.trim() === "0" ? "—" : `${damageDice} ${damageType}`;
 }
 
+/** "very-rare" becomes "very rare"; "varies" becomes "rarity varies". */
+export function rarityLabel(rarity: string): string {
+  return rarity === "varies" ? "rarity varies" : rarity.replace(/[-_]/g, " ");
+}
+
 /** "Weapon (longsword), rare (requires attunement by a wizard)". */
 export function magicItemSubtitle(m: {
   type: string;
@@ -85,5 +90,5 @@ export function magicItemSubtitle(m: {
 }): string {
   const base = m.baseItem ? ` (${m.baseItem})` : "";
   const attune = m.requiresAttunement ? ` (requires attunement${m.attunementDetail ? ` ${m.attunementDetail}` : ""})` : "";
-  return `${titleKey(m.type)}${base}, ${m.rarity.replace(/-/g, " ")}${attune}`;
+  return `${titleKey(m.type)}${base}, ${rarityLabel(m.rarity)}${attune}`;
 }

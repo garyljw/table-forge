@@ -331,6 +331,15 @@ describe("magic items", () => {
     expect(normaliseMagicItem({ ...fx.testCharm, attunement_detail: "requires attunement" }).attunementDetail).toBeNull();
     expect(normaliseMagicItem({ ...fx.testCharm, requires_attunement: false }).attunementDetail).toBeNull();
   });
+  it("handles parentheses and case in the attunement detail", () => {
+    const detail = (attunement_detail: string | null) => normaliseMagicItem({ ...fx.testCharm, attunement_detail }).attunementDetail;
+    expect(detail("(requires attunement by a wizard)")).toBe("by a wizard");
+    expect(detail("Requires Attunement")).toBeNull();
+    expect(detail("(Requires Attunement)")).toBeNull();
+    expect(detail("Requires Attunement by a Cleric or Paladin")).toBe("by a Cleric or Paladin");
+    expect(detail("requires attunement outdoors at night")).toBe("outdoors at night");
+    expect(detail(null)).toBeNull();
+  });
   it("maps shields to armor, ammunition to weapon, and a missing rarity to varies", () => {
     expect(normaliseMagicItem({ ...fx.testCharm, category: { key: "shield" }, armor: { name: "Shield" } })).toMatchObject({ type: "armor", baseItem: "shield" });
     expect(normaliseMagicItem({ ...fx.testCharm, category: { key: "ammunition" } }).type).toBe("weapon");

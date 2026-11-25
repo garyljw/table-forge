@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { magicItemSubtitle } from "../format.js";
+import { magicItemSubtitle, rarityLabel } from "../format.js";
 import { SRD_DOCUMENT } from "../test-fixtures.js";
 import { rollLabel } from "../components/RollTableView.js";
 import { MagicItemDetailPage, RollTableDetailPage, RuleSectionDetailPage } from "./DetailPages.js";
@@ -97,6 +97,13 @@ describe("magic item detail", () => {
   it("builds the subtitle", () => {
     expect(magicItemSubtitle({ type: "wondrous-item", rarity: "very-rare", baseItem: null, requiresAttunement: false, attunementDetail: null })).toBe("Wondrous item, very rare");
     expect(magicItemSubtitle({ type: "weapon", rarity: "uncommon", baseItem: "longsword", requiresAttunement: true, attunementDetail: null })).toBe("Weapon (longsword), uncommon (requires attunement)");
+    expect(magicItemSubtitle({ type: "ring", rarity: "varies", baseItem: null, requiresAttunement: false, attunementDetail: null })).toBe("Ring, rarity varies");
+  });
+
+  it("labels rarities", () => {
+    expect(rarityLabel("very-rare")).toBe("very rare");
+    expect(rarityLabel("varies")).toBe("rarity varies");
+    expect(rarityLabel("rare")).toBe("rare");
   });
 });
 

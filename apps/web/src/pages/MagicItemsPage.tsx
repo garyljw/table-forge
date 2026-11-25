@@ -4,7 +4,7 @@ import { listMagicItems } from "../api/rules.js";
 import { Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
-import { keyOptions, titleKey } from "../format.js";
+import { capitalise, keyOptions, rarityLabel, titleKey } from "../format.js";
 import { useApi } from "../hooks/useApi.js";
 import { useDocNames } from "../hooks/useDocNames.js";
 import { useQueryParams } from "../hooks/useQueryParams.js";
@@ -39,7 +39,7 @@ function MagicItemRow({ item, docName }: { item: MagicItemSummary; docName: stri
           {item.requiresAttunement && <span className="tag">Attunement</span>}
         </span>
         <span className="row-sub">
-          {titleKey(item.type)} · {titleKey(item.rarity)}
+          {titleKey(item.type)} · {capitalise(rarityLabel(item.rarity))}
           {docName && item.documentKey !== SRD_KEY && ` · ${docName}`}
         </span>
       </Link>

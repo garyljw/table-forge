@@ -30,8 +30,8 @@ export function RollTableView({ table: t }: { table: RollTable }) {
             </tr>
           </thead>
           <tbody>
-            {t.rows.map((r) => (
-              <tr key={`${r.min}-${r.max}`}>
+            {t.rows.map((r, ri) => (
+              <tr key={`${ri}-${r.min}-${r.max}`}>
                 <th scope="row">{rollLabel(r.min, r.max)}</th>
                 {r.cells.map((cell, i) => (
                   <td key={i}>{cell}</td>
