@@ -39,6 +39,7 @@ export function normaliseMonster(raw: RawCreature): Monster {
   const hitDice = (raw.hit_dice ?? "").replace(/\s+/g, "");
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     size: raw.size.key,
@@ -82,5 +83,9 @@ export function normaliseMonster(raw: RawCreature): Monster {
     bonusActions: actionsOfType(actions, "BONUS_ACTION"),
     reactions: actionsOfType(actions, "REACTION"),
     legendaryActions: actionsOfType(actions, "LEGENDARY_ACTION"),
+    // Open5e v2 creatures carry no lair or regional data (only ACTION, BONUS_ACTION, REACTION and
+    // LEGENDARY_ACTION action types), so these stay null until a source supplies them.
+    lairActions: null,
+    regionalEffects: null,
   };
 }

@@ -1,6 +1,6 @@
 // Small hand-written fixtures modelled on Open5e v2 responses. SRD 5.1 text only
 // (CC-BY-4.0); "Test Wyrm" is invented to cover the fields the SRD records lack.
-import type { RawArmor, RawBackground, RawClass, RawCondition, RawCreature, RawDocument, RawFeat, RawSpecies, RawSpell, RawWeapon } from "./raw.js";
+import type { RawArmor, RawMagicItem, RawBackground, RawClass, RawCondition, RawCreature, RawDocument, RawFeat, RawSpecies, RawSpell, RawWeapon } from "./raw.js";
 
 export const srdDocument: RawDocument = {
   key: "srd-2014",
@@ -351,4 +351,31 @@ export const breastplate: RawArmor = {
   ac_base: 14,
   ac_add_dexmod: true,
   ac_cap_dexmod: 2,
+};
+
+// Magic items are invented ("Test ..."), shaped like Open5e v2 /magicitems/ records.
+export const testBlade: RawMagicItem = {
+  key: "srd_blade",
+  name: "Test Blade +1",
+  document: srdRef,
+  desc: "You have a +1 bonus to attack and damage rolls made with this magic weapon.\r\n",
+  category: { key: "weapon", name: "Weapon" },
+  rarity: { key: "uncommon", name: "Uncommon" },
+  weapon: { name: "Longsword" },
+  armor: null,
+  requires_attunement: false,
+  attunement_detail: null,
+};
+
+export const testCharm: RawMagicItem = {
+  key: "tob_charm",
+  name: "Test Charm",
+  document: { key: "tob", name: "Tome of Beasts", gamesystem: { key: "5e-2014" } },
+  desc: "A charm that hums faintly.",
+  category: { key: "wondrous-item", name: "Wondrous Item" },
+  rarity: { key: "rare", name: "Rare" },
+  weapon: null,
+  armor: null,
+  requires_attunement: true,
+  attunement_detail: "Requires Attunement by a Cleric",
 };

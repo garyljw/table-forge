@@ -5,6 +5,7 @@ import { cleanOrNull, cleanText } from "./text.js";
 export function normaliseFeat(raw: RawFeat): Feat {
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     prerequisite: cleanOrNull(raw.prerequisite),

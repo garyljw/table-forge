@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId } from "./common.js";
+import { DocumentKey, RecordId, DmOnly } from "./common.js";
 
 /**
  * One racial trait. Open5e traits are free text (ability increases, speed, languages, and so on
@@ -27,6 +27,7 @@ export const SpeciesSummary = z.object({
 export type SpeciesSummary = z.infer<typeof SpeciesSummary>;
 
 export const Species = SpeciesSummary.extend({
+  dmOnly: DmOnly,
   description: z.string(),
   traits: z.array(SpeciesTrait),
 });

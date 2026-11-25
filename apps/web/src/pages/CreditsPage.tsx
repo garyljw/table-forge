@@ -19,6 +19,9 @@ function counts(c: Doc["counts"]): string {
       ["feats", c.feats],
       ["weapons", c.weapons],
       ["armor", c.armor],
+      ["magic items", c.magic_items],
+      ["roll tables", c.roll_tables],
+      ["rules sections", c.rule_sections],
     ] as const
   )
     .filter(([, n]) => n > 0)

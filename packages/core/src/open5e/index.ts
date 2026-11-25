@@ -13,6 +13,7 @@ export {
 export { buildAttribution, normaliseDocument, normaliseLicense } from "./document.js";
 export { checkImport, DEFAULT_GUARD, type GuardOptions, type TypeResult } from "./guard.js";
 export { normaliseFeat } from "./feat.js";
+export { normaliseMagicItem } from "./magic-item.js";
 export { normaliseMonster } from "./monster.js";
 export type * from "./raw.js";
 export {
@@ -26,6 +27,7 @@ export {
   featStatement,
   isStatementTooLarge,
   licenseStatement,
+  magicItemStatement,
   MAX_STATEMENT_BYTES,
   monsterStatement,
   speciesStatement,

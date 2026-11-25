@@ -1,5 +1,5 @@
 import { buildImportStatements, foldName, type ImportBundle } from "@table-forge/core";
-import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, Monster, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, RollTable, RuleSection, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 
 export const srd: SourceDocument = {
@@ -44,6 +44,7 @@ export function spell(id: string, name: string, over: Partial<Spell> = {}): Spel
   return {
     id,
     documentKey: "srd-2014",
+    dmOnly: false,
     name,
     level: 1,
     school: "evocation",
@@ -74,6 +75,7 @@ export function monster(id: string, name: string, over: Partial<Monster> = {}): 
   return {
     id,
     documentKey: "srd-2014",
+    dmOnly: false,
     name,
     size: "medium",
     type: "humanoid",
@@ -102,6 +104,8 @@ export function monster(id: string, name: string, over: Partial<Monster> = {}): 
     bonusActions: [],
     reactions: [],
     legendaryActions: [],
+    lairActions: null,
+    regionalEffects: null,
     ...over,
   };
 }
@@ -110,6 +114,7 @@ export function klass(id: string, name: string, over: Partial<ClassDetail> = {})
   return {
     id,
     documentKey: "srd-2014",
+    dmOnly: false,
     name,
     parentClass: null,
     hitDice: "D6",
@@ -127,13 +132,14 @@ export function klass(id: string, name: string, over: Partial<ClassDetail> = {})
 }
 
 export function condition(id: string, name: string, over: Partial<Condition> = {}): Condition {
-  return { id, documentKey: "srd-2014", name, description: `${name} text`, ...over };
+  return { id, documentKey: "srd-2014", dmOnly: false, name, description: `${name} text`, ...over };
 }
 
 export function species(id: string, name: string, over: Partial<Species> = {}): Species {
   return {
     id,
     documentKey: "srd-2014",
+    dmOnly: false,
     name,
     parentSpecies: null,
     description: `${name} description`,
@@ -146,6 +152,7 @@ export function background(id: string, name: string, over: Partial<Background> =
   return {
     id,
     documentKey: "srd-2014",
+    dmOnly: false,
     name,
     description: `${name} description`,
     benefits: [{ name: "Skill Proficiencies", description: "Insight, Religion", type: "skill_proficiency" }],
@@ -154,13 +161,14 @@ export function background(id: string, name: string, over: Partial<Background> =
 }
 
 export function feat(id: string, name: string, over: Partial<Feat> = {}): Feat {
-  return { id, documentKey: "srd-2014", name, prerequisite: null, category: "GENERAL", description: `${name} description`, benefits: ["A benefit."], ...over };
+  return { id, documentKey: "srd-2014", dmOnly: false, name, prerequisite: null, category: "GENERAL", description: `${name} description`, benefits: ["A benefit."], ...over };
 }
 
 export function weapon(id: string, name: string, over: Partial<Weapon> = {}): Weapon {
   return {
     id,
     documentKey: "srd-2014",
+    dmOnly: false,
     name,
     category: "martial",
     kind: "melee",
@@ -177,6 +185,7 @@ export function armor(id: string, name: string, over: Partial<Armor> = {}): Armo
   return {
     id,
     documentKey: "srd-2014",
+    dmOnly: false,
     name,
     category: "medium",
     acBase: 14,
@@ -187,6 +196,47 @@ export function armor(id: string, name: string, over: Partial<Armor> = {}): Armo
     acDisplay: "14 + Dex modifier (max 2)",
     ...over,
   };
+}
+
+export function magicItem(id: string, name: string, over: Partial<MagicItem> = {}): MagicItem {
+  return {
+    id,
+    documentKey: "srd-2014",
+    dmOnly: false,
+    name,
+    type: "wondrous-item",
+    rarity: "uncommon",
+    requiresAttunement: false,
+    baseItem: null,
+    attunementDetail: null,
+    description: `${name} description`,
+    sentient: false,
+    cursed: false,
+    ...over,
+  };
+}
+
+export function rollTable(id: string, name: string, over: Partial<RollTable> = {}): RollTable {
+  return {
+    id,
+    documentKey: "srd-2014",
+    dmOnly: false,
+    name,
+    category: "trinket",
+    dice: "d4",
+    description: null,
+    columns: ["Trinket"],
+    rows: [
+      { min: 1, max: 1, cells: ["A bent spoon"] },
+      { min: 2, max: 3, cells: ["A cracked marble"] },
+      { min: 4, max: 4, cells: ["A feather"] },
+    ],
+    ...over,
+  };
+}
+
+export function ruleSection(id: string, name: string, over: Partial<RuleSection> = {}): RuleSection {
+  return { id, documentKey: "srd-2014", dmOnly: false, name, category: "variant-rule", relatedIds: [], body: `${name} body`, ...over };
 }
 
 export const SEED = {
@@ -246,6 +296,25 @@ export const SEED = {
     armor("srd_leather", "Leather", { category: "light", acBase: 11, dexModifierCap: null, acDisplay: "11 + Dex modifier" }),
     armor("secret_hidden-plate", "Hidden Plate", { documentKey: "secret-book", category: "heavy" }),
   ],
+  magicItems: [
+    magicItem("srd_test-blade", "Test Blade +1", { type: "weapon", baseItem: "longsword" }),
+    magicItem("srd_test-ring", "Test Ring", { type: "ring", rarity: "rare", requiresAttunement: true, attunementDetail: "by a wizard" }),
+    magicItem("srd_test-potion", "Test Potion", { type: "potion", rarity: "common" }),
+    magicItem("tob_test-charm", "Test Charm", { documentKey: "tob", rarity: "very-rare", cursed: true }),
+    magicItem("secret_hidden-idol", "Hidden Idol", { documentKey: "secret-book", rarity: "legendary" }),
+  ],
+  rollTables: [
+    rollTable("srd_test-trinkets", "Test Trinkets"),
+    rollTable("srd_test-loot", "Test Loot", { category: "treasure", dice: "d6", description: "Roll for loot.", columns: ["Item", "Value"], rows: [{ min: 1, max: 6, cells: ["A coin", "1 gp"] }] }),
+    rollTable("tob_test-encounters", "Test Encounters", { documentKey: "tob", category: "encounter" }),
+    rollTable("secret_hidden-table", "Hidden Table", { documentKey: "secret-book", category: "madness" }),
+  ],
+  ruleSections: [
+    ruleSection("srd_test-flanking", "Test Flanking", { relatedIds: ["srd_wizard"], body: "Flank **well**." }),
+    ruleSection("srd_test-pit", "Test Pit", { category: "trap" }),
+    ruleSection("tob_test-fever", "Test Fever", { documentKey: "tob", category: "disease" }),
+    ruleSection("secret_hidden-section", "Hidden Section", { documentKey: "secret-book", category: "lore" }),
+  ],
 };
 
 export const LICENSES: LicenseText[] = [
@@ -267,6 +336,7 @@ export const openBundle = (run: string, over: Partial<ImportBundle> = {}): strin
       feats: SEED.feats.filter((x) => x.documentKey !== "secret-book"),
       weapons: SEED.weapons.filter((x) => x.documentKey !== "secret-book"),
       armor: SEED.armor.filter((x) => x.documentKey !== "secret-book"),
+      magicItems: SEED.magicItems.filter((x) => x.documentKey !== "secret-book"),
       ...over,
     },
     run,
@@ -278,7 +348,7 @@ export async function runStatements(statements: string[]): Promise<void> {
 
 /** Removes everything, then loads the Open5e seed (via the real import SQL) and a private document's rows. */
 export async function seedRules(): Promise<void> {
-  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
+  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
   const j = (v: unknown) => JSON.stringify(v);
   const priv = [
     env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
@@ -336,9 +406,38 @@ export async function seedRules(): Promise<void> {
           x.id, x.documentKey, x.name, foldName(x.name), x.category, x.acBase, x.acDisplay, j(x),
         ),
       ),
+    ...SEED.magicItems
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO magic_items (id, document_key, name, name_search, type, rarity, requires_attunement, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(
+          x.id, x.documentKey, x.name, foldName(x.name), x.type, x.rarity, x.requiresAttunement ? 1 : 0, j(x),
+        ),
+      ),
+    ...SEED.rollTables
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) => rollTableInsert(x, null)),
+    ...SEED.ruleSections
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) => ruleSectionInsert(x, null)),
   ];
   await env.DB.batch([...clear.map((s) => env.DB.prepare(s)), ...priv]);
   // Open5e rows go in afterwards: the document guard needs the documents to exist, and the
   // private document is not an Open5e one, so its rows are untouched by the import.
   await runStatements(openBundle("run-1"));
+  // Open5e supplies no roll tables, so these are written directly. The public ones carry run-1's marker
+  // so the import's stale-row deletes (which would otherwise remove any row in an Open5e document) keep them.
+  await env.DB.batch(SEED.rollTables.filter((x) => x.documentKey !== "secret-book").map((x) => rollTableInsert(x, "run-1")));
+  await env.DB.batch(SEED.ruleSections.filter((x) => x.documentKey !== "secret-book").map((x) => ruleSectionInsert(x, "run-1")));
+}
+
+function ruleSectionInsert(x: RuleSection, run: string | null) {
+  return env.DB.prepare("INSERT INTO rule_sections (id, document_key, name, name_search, category, data, import_run) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(
+    x.id, x.documentKey, x.name, foldName(x.name), x.category, JSON.stringify(x), run,
+  );
+}
+
+function rollTableInsert(x: RollTable, run: string | null) {
+  return env.DB.prepare("INSERT INTO roll_tables (id, document_key, name, name_search, category, dice, data, import_run) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(
+    x.id, x.documentKey, x.name, foldName(x.name), x.category, x.dice, JSON.stringify(x), run,
+  );
 }

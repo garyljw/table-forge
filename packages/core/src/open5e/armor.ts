@@ -26,6 +26,7 @@ export function normaliseArmor(raw: RawArmor): Armor {
   const acDisplay = cleanText(raw.ac_display);
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     category: armorCategory(raw.category),

@@ -6,7 +6,10 @@ import { DocumentKey } from "./common.js";
 import { Condition, ConditionSummary } from "./condition.js";
 import { LicenseText, SourceDocument } from "./document.js";
 import { Feat, FeatSummary } from "./feat.js";
+import { MagicItem, MagicItemRarity, MagicItemSummary, MagicItemType } from "./magic-item.js";
 import { Monster, MonsterSummary } from "./monster.js";
+import { RollTable, RollTableCategory, RollTableSummary } from "./roll-table.js";
+import { RuleSection, RuleSectionCategory, RuleSectionSummary } from "./rule-section.js";
 import { Species, SpeciesSummary } from "./species.js";
 import { Spell, SpellLevel, SpellSummary } from "./spell.js";
 import { Weapon, WeaponCategory, WeaponKind, WeaponSummary } from "./weapon.js";
@@ -105,6 +108,24 @@ export const ArmorListQuery = ListQueryBase.extend({
 });
 export type ArmorListQuery = z.infer<typeof ArmorListQuery>;
 
+export const MagicItemListQuery = ListQueryBase.extend({
+  type: MagicItemType.optional(),
+  rarity: MagicItemRarity.optional(),
+  /** `true` for items that need attunement, `false` for those that do not. */
+  attunement: boolParam.optional(),
+});
+export type MagicItemListQuery = z.infer<typeof MagicItemListQuery>;
+
+export const RollTableListQuery = ListQueryBase.extend({
+  category: RollTableCategory.optional(),
+});
+export type RollTableListQuery = z.infer<typeof RollTableListQuery>;
+
+export const RuleSectionListQuery = ListQueryBase.extend({
+  category: RuleSectionCategory.optional(),
+});
+export type RuleSectionListQuery = z.infer<typeof RuleSectionListQuery>;
+
 // ---- Response bodies ----
 
 export const paginated = <T extends z.ZodType>(item: T) =>
@@ -170,6 +191,21 @@ export type ArmorListResponse = z.infer<typeof ArmorListResponse>;
 export const ArmorDetailResponse = detail(Armor);
 export type ArmorDetailResponse = z.infer<typeof ArmorDetailResponse>;
 
+export const MagicItemListResponse = paginated(MagicItemSummary);
+export type MagicItemListResponse = z.infer<typeof MagicItemListResponse>;
+export const MagicItemDetailResponse = detail(MagicItem);
+export type MagicItemDetailResponse = z.infer<typeof MagicItemDetailResponse>;
+
+export const RollTableListResponse = paginated(RollTableSummary);
+export type RollTableListResponse = z.infer<typeof RollTableListResponse>;
+export const RollTableDetailResponse = detail(RollTable);
+export type RollTableDetailResponse = z.infer<typeof RollTableDetailResponse>;
+
+export const RuleSectionListResponse = paginated(RuleSectionSummary);
+export type RuleSectionListResponse = z.infer<typeof RuleSectionListResponse>;
+export const RuleSectionDetailResponse = detail(RuleSection);
+export type RuleSectionDetailResponse = z.infer<typeof RuleSectionDetailResponse>;
+
 /** `GET /api/rules/documents`: every document with public records, for the credits page. */
 export const DocumentListResponse = z.object({
   items: z.array(
@@ -184,6 +220,9 @@ export const DocumentListResponse = z.object({
         feats: z.number().int(),
         weapons: z.number().int(),
         armor: z.number().int(),
+        magic_items: z.number().int(),
+        roll_tables: z.number().int(),
+        rule_sections: z.number().int(),
       }),
     }),
   ),

@@ -34,6 +34,7 @@ export function makeCharacter(over: Partial<CharacterData> = {}): CharacterData 
 const armor = (id: string, name: string, category: Armor["category"], acBase: number, p: Partial<Armor> = {}): Armor => ({
   id,
   documentKey: "srd-2014",
+  dmOnly: false,
   name,
   category,
   acBase,
@@ -52,6 +53,7 @@ export const plate = armor("srd_plate", "Plate", "heavy", 18, { strengthRequired
 const weapon = (id: string, name: string, category: Weapon["category"], kind: Weapon["kind"], damageDice: string, damageType: string | null, props: string[], range: Weapon["range"] = null): Weapon => ({
   id,
   documentKey: "srd-2014",
+  dmOnly: false,
   name,
   category,
   kind,
@@ -73,6 +75,7 @@ export const weaponRecords = Object.fromEntries([rapier, longsword, handaxe, lon
 export function makeClass(name: string, saves: string[], casterType: string | null, table: ClassDetail["table"] = []): ClassDetail {
   return {
     id: `srd_${name.toLowerCase()}`,
+    dmOnly: false,
     documentKey: "srd-2014",
     name,
     parentClass: null,

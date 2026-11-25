@@ -11,8 +11,14 @@ import {
   FeatDetailResponse,
   FeatListResponse,
   LicenseListResponse,
+  MagicItemDetailResponse,
+  MagicItemListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
+  RollTableDetailResponse,
+  RollTableListResponse,
+  RuleSectionDetailResponse,
+  RuleSectionListResponse,
   SpeciesDetailResponse,
   SpeciesListResponse,
   SpellDetailResponse,
@@ -22,7 +28,7 @@ import {
 } from "@table-forge/shared";
 import { apiGet, type QueryParams } from "./client.js";
 
-export type RuleKind = "spells" | "monsters" | "classes" | "conditions" | "species" | "backgrounds" | "feats" | "weapons" | "armor";
+export type RuleKind = "spells" | "monsters" | "classes" | "conditions" | "species" | "backgrounds" | "feats" | "weapons" | "armor" | "magic_items" | "roll_tables" | "rule_sections";
 
 export const listSpells = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/spells", SpellListResponse, p, s);
 export const getSpell = (id: string, s?: AbortSignal) =>
@@ -55,6 +61,15 @@ export const getWeapon = (id: string, s?: AbortSignal) =>
 export const listArmor = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/armor", ArmorListResponse, p, s);
 export const getArmor = (id: string, s?: AbortSignal) =>
   apiGet(`/api/rules/armor/${encodeURIComponent(id)}`, ArmorDetailResponse, {}, s);
+export const listMagicItems = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/magic-items", MagicItemListResponse, p, s);
+export const getMagicItem = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/magic-items/${encodeURIComponent(id)}`, MagicItemDetailResponse, {}, s);
+export const listRollTables = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/roll-tables", RollTableListResponse, p, s);
+export const getRollTable = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/roll-tables/${encodeURIComponent(id)}`, RollTableDetailResponse, {}, s);
+export const listRuleSections = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/rule-sections", RuleSectionListResponse, p, s);
+export const getRuleSection = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/rule-sections/${encodeURIComponent(id)}`, RuleSectionDetailResponse, {}, s);
 
 // Documents and licences depend on who is signed in (private books are listed for Access users only),
 // so they are fetched fresh on every use and never held in a module-level cache that could outlive a

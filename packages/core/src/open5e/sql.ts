@@ -6,6 +6,7 @@ import {
   type Condition,
   type Feat,
   type LicenseText,
+  type MagicItem,
   type Monster,
   type RuleTable,
   type SourceDocument,
@@ -41,6 +42,7 @@ export interface ImportBundle {
   feats: Feat[];
   weapons: Weapon[];
   armor: Armor[];
+  magicItems: MagicItem[];
 }
 
 /** D1 rejects statements over 100 KB. */
@@ -295,6 +297,24 @@ export function armorStatement(a: Armor, run: string): string {
   );
 }
 
+export function magicItemStatement(m: MagicItem, run: string): string {
+  return recordUpsert(
+    "magic_items",
+    m.documentKey,
+    [
+      ["id", sqlText(m.id)],
+      ["document_key", sqlText(m.documentKey)],
+      ["name", sqlText(m.name)],
+      ["name_search", sqlText(foldName(m.name))],
+      ["type", sqlText(m.type)],
+      ["rarity", sqlText(m.rarity)],
+      ["requires_attunement", sqlBool(m.requiresAttunement)],
+      ["data", json(m)],
+    ],
+    run,
+  );
+}
+
 /** Deletes Open5e rows that this run did not stamp. Always the last statements of an import. */
 export function staleRowStatements(run: string): string[] {
   const stale = `import_run IS NOT ${sqlText(run)}`;
@@ -328,6 +348,7 @@ export function buildImportStatements(bundle: ImportBundle, run: string): string
     ...bundle.feats.map((x) => featStatement(x, run)),
     ...bundle.weapons.map((x) => weaponStatement(x, run)),
     ...bundle.armor.map((x) => armorStatement(x, run)),
+    ...bundle.magicItems.map((x) => magicItemStatement(x, run)),
     ...staleRowStatements(run),
   ];
 }

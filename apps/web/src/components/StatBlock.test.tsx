@@ -65,3 +65,29 @@ describe("StatBlock", () => {
     expect(document.body.textContent).not.toMatch(/3 legendary actions/);
   });
 });
+
+describe("StatBlock lair data", () => {
+  const entry = { name: "Shifting Floor", description: "The floor tilts.", usage: null, legendaryCost: null };
+  it("shows lair actions and regional effects after legendary actions", () => {
+    render(
+      <StatBlock
+        monster={{
+          ...goblin,
+          legendaryActions: [{ name: "Detect", description: "Looks.", usage: null, legendaryCost: 1 }],
+          lairActions: { description: "On initiative count 20 the lair acts.", items: [entry] },
+          regionalEffects: { description: "", items: [{ ...entry, name: "Cold Wind" }] },
+        }}
+      />,
+    );
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings.slice(-3)).toEqual(["Legendary Actions", "Lair Actions", "Regional Effects"]);
+    expect(screen.getByText("On initiative count 20 the lair acts.")).toBeTruthy();
+    expect(screen.getByText("Shifting Floor.")).toBeTruthy();
+  });
+
+  it("shows no lair headings when there are none", () => {
+    render(<StatBlock monster={goblin} />);
+    expect(screen.queryByText("Lair Actions")).toBeNull();
+    expect(screen.queryByText("Regional Effects")).toBeNull();
+  });
+});

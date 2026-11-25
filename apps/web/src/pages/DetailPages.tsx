@@ -1,11 +1,13 @@
 import { Link } from "wouter";
-import { getArmor, getBackground, getClass, getFeat, getMonster, getSpecies, getSpell, getWeapon } from "../api/rules.js";
+import { getArmor, getBackground, getClass, getFeat, getMagicItem, getMonster, getRollTable, getRuleSection, getSpecies, getSpell, getWeapon } from "../api/rules.js";
 import { ErrorNote, Loading } from "../components/States.js";
 import { SourceLine } from "../components/SourceLine.js";
 import { SpellCard } from "../components/SpellCard.js";
 import { StatBlock } from "../components/StatBlock.js";
 import { ClassView } from "../components/ClassView.js";
-import { ArmorView, BackgroundView, FeatView, SpeciesView, WeaponView } from "../components/OptionViews.js";
+import { ArmorView, BackgroundView, FeatView, MagicItemView, SpeciesView, WeaponView } from "../components/OptionViews.js";
+import { RuleSectionView } from "../components/RuleSectionView.js";
+import { RollTableView } from "../components/RollTableView.js";
 import { useApi, type ApiState } from "../hooks/useApi.js";
 
 function DetailFrame<T>({
@@ -151,6 +153,54 @@ export function ArmorDetailPage({ id }: { id: string }) {
       render={(r) => (
         <>
           <ArmorView armor={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function MagicItemDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getMagicItem(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/magic-items", label: "All magic items" }}
+      render={(r) => (
+        <>
+          <MagicItemView item={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function RollTableDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getRollTable(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/roll-tables", label: "All roll tables" }}
+      render={(r) => (
+        <>
+          <RollTableView table={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function RuleSectionDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getRuleSection(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/rules", label: "All rules sections" }}
+      render={(r) => (
+        <>
+          <RuleSectionView section={r.data} />
           <SourceLine document={r.document} />
         </>
       )}

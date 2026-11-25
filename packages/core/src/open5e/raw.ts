@@ -213,3 +213,20 @@ export interface RawArmor {
   ac_add_dexmod?: boolean;
   ac_cap_dexmod?: number | null;
 }
+
+export interface RawMagicItem {
+  key: string;
+  name: string;
+  document: RawDocumentRef;
+  desc?: string | null;
+  /** `weapon`, `armor`, `wondrous-item`, `potion`, `ring`, and so on. */
+  category?: { key: string; name?: string } | null;
+  /** Null for some items; we store those as `varies`. */
+  rarity?: { key: string; name?: string } | null;
+  /** The ordinary weapon or armour this item is a version of, when it is one. */
+  weapon?: { name: string } | null;
+  armor?: { name: string } | null;
+  requires_attunement?: boolean;
+  /** For example `requires attunement by a paladin`. */
+  attunement_detail?: string | null;
+}

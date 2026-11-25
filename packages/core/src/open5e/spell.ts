@@ -19,6 +19,7 @@ export function normaliseSpell(raw: RawSpell): Spell {
       : null;
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     level: raw.level,

@@ -72,7 +72,7 @@ describe("routes", () => {
   });
 
   it("requires auth for every character option route, lists and details", async () => {
-    for (const path of ["species", "backgrounds", "feats", "weapons", "armor"]) {
+    for (const path of ["species", "backgrounds", "feats", "weapons", "armor", "magic-items", "roll-tables", "rule-sections"]) {
       expect((await withHeader(`https://example.com/api/rules/${path}`)).status).toBe(401);
       expect((await withHeader(`https://example.com/api/rules/${path}/srd_x`)).status).toBe(401);
       expect((await authedFetch(`https://example.com/api/rules/${path}`)).status).toBe(200);
