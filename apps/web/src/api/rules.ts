@@ -56,37 +56,8 @@ export const listArmor = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules
 export const getArmor = (id: string, s?: AbortSignal) =>
   apiGet(`/api/rules/armor/${encodeURIComponent(id)}`, ArmorDetailResponse, {}, s);
 
-// Documents and licences hardly ever change, so one fetch per page load is plenty.
-let documentsPromise: ReturnType<typeof fetchDocuments> | null = null;
-let licensesPromise: ReturnType<typeof fetchLicenses> | null = null;
-const fetchDocuments = () => apiGet("/api/rules/documents", DocumentListResponse);
-const fetchLicenses = () => apiGet("/api/rules/licenses", LicenseListResponse);
-
-export function getDocuments() {
-  if (documentsPromise === null) {
-    const p = fetchDocuments();
-    documentsPromise = p;
-    // Forget a failed fetch so the next caller retries.
-    p.catch(() => {
-      if (documentsPromise === p) documentsPromise = null;
-    });
-  }
-  return documentsPromise;
-}
-
-export function getLicenses() {
-  if (licensesPromise === null) {
-    const p = fetchLicenses();
-    licensesPromise = p;
-    p.catch(() => {
-      if (licensesPromise === p) licensesPromise = null;
-    });
-  }
-  return licensesPromise;
-}
-
-/** Forget cached documents and licences. For tests. */
-export function resetRulesCache() {
-  documentsPromise = null;
-  licensesPromise = null;
-}
+// Documents and licences depend on who is signed in (private books are listed for Access users only),
+// so they are fetched fresh on every use and never held in a module-level cache that could outlive a
+// change of identity. The responses are small.
+export const getDocuments = (s?: AbortSignal) => apiGet("/api/rules/documents", DocumentListResponse, {}, s);
+export const getLicenses = (s?: AbortSignal) => apiGet("/api/rules/licenses", LicenseListResponse, {}, s);

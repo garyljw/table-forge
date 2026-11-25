@@ -1,5 +1,5 @@
 import { foldName } from "@table-forge/core";
-import type { RuleTable } from "@table-forge/shared";
+import { RULE_TABLES, type RuleTable } from "@table-forge/shared";
 
 /**
  * Query building for the rules tables. Every value reaches SQL as a bound parameter;
@@ -8,12 +8,32 @@ import type { RuleTable } from "@table-forge/shared";
  */
 
 /**
+ * Which documents a request may read. Built only by `documentScopeFor` (permissions.ts), from the
+ * caller's identity, so a route cannot widen it by accident. Every query in this file takes one.
+ */
+export interface DocumentScope {
+  readonly includePrivate: boolean;
+}
+
+/**
+ * THE one place the document visibility rule is written as SQL. `d` is the `documents` table.
+ * Public documents are always readable; private ones (the owner's transcribed books) only when
+ * the scope says so. Both fragments are fixed text: nothing from the request reaches them.
+ */
+export function visibilityClause(scope: DocumentScope): string {
+  return scope.includePrivate ? "d.visibility IN ('public', 'private')" : "d.visibility = 'public'";
+}
+
+/**
  * Collects `WHERE` conditions and their bound values. `t` is the record table and `d`
- * the `documents` table it is joined to. Only documents marked public are ever served
- * here; private data would need its own routes with their own access check.
+ * the `documents` table it is joined to. The first condition is always the visibility
+ * clause for the caller's scope, and it cannot be removed.
  */
 export class Where {
-  private readonly clauses: string[] = ["d.visibility = 'public'"];
+  private readonly clauses: string[];
+  constructor(scope: DocumentScope) {
+    this.clauses = [visibilityClause(scope)];
+  }
   readonly params: (string | number)[] = [];
 
   add(clause: string, ...values: (string | number)[]): this {
@@ -72,15 +92,16 @@ export function pageEnvelope<T>(items: T[], total: number, page: number, pageSiz
   return { items, page, pageSize, total, totalPages: Math.ceil(total / pageSize) };
 }
 
-/** A record's JSON and its document's JSON, or null when the id is unknown or not public. */
+/** A record's JSON and its document's JSON, or null when the id is unknown or its document is not visible to `scope`. */
 export async function selectDetail(
   db: D1Database,
+  scope: DocumentScope,
   table: RuleTable,
   id: string,
 ): Promise<{ data: unknown; document: unknown } | null> {
   const row = await db
     .prepare(
-      `SELECT t.data AS data, d.data AS document FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE t.id = ? AND d.visibility = 'public'`,
+      `SELECT t.data AS data, d.data AS document FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE t.id = ? AND ${visibilityClause(scope)}`,
     )
     .bind(id)
     .first<{ data: string; document: string }>();
@@ -90,17 +111,42 @@ export async function selectDetail(
 export type ChildTable = "classes" | "species";
 
 /** Fixed query text per table: the table name is never taken from the caller. `columns` is written in this codebase. */
-const CHILD_QUERIES: Record<ChildTable, (columns: string) => string> = {
-  classes: (columns) =>
-    `SELECT ${columns} FROM classes t JOIN documents d ON d.key = t.document_key WHERE d.visibility = 'public' AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
-  species: (columns) =>
-    `SELECT ${columns} FROM species t JOIN documents d ON d.key = t.document_key WHERE d.visibility = 'public' AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
+const CHILD_QUERIES: Record<ChildTable, (columns: string, scope: DocumentScope) => string> = {
+  classes: (columns, scope) =>
+    `SELECT ${columns} FROM classes t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
+  species: (columns, scope) =>
+    `SELECT ${columns} FROM species t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
 };
 
-/** Every public record of `table` whose parent is `parentId`, with no paging (a class or species has a few dozen children). */
-export async function selectChildren<Row>(db: D1Database, table: ChildTable, columns: string, parentId: string): Promise<Row[]> {
+/** Every record visible to `scope` of `table` whose parent is `parentId`, with no paging (a class or species has a few dozen children). */
+export async function selectChildren<Row>(db: D1Database, scope: DocumentScope, table: ChildTable, columns: string, parentId: string): Promise<Row[]> {
   const sql = CHILD_QUERIES[table];
   if (sql === undefined) throw new Error(`no children query for table "${String(table)}"`);
-  const { results } = await db.prepare(sql(columns)).bind(parentId).all<Row>();
+  const { results } = await db.prepare(sql(columns, scope)).bind(parentId).all<Row>();
+  return results;
+}
+
+/** Documents visible to `scope`, as JSON rows. */
+export async function selectDocuments(db: D1Database, scope: DocumentScope) {
+  const [docs, ...counts] = await db.batch([
+    db.prepare(`SELECT d.data AS data FROM documents d WHERE ${visibilityClause(scope)} ORDER BY d.display_name COLLATE NOCASE, d.key`),
+    ...RULE_TABLES.map((t) => db.prepare(`SELECT t.document_key AS document_key, COUNT(*) AS n FROM ${t} t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} GROUP BY t.document_key`)),
+  ]);
+  return { docs: docs?.results ?? [], counts };
+}
+
+/**
+ * Licence texts used by a document visible to `scope`. Private documents list no licences, so they
+ * contribute nothing here.
+ */
+export async function selectLicenses(db: D1Database, scope: DocumentScope) {
+  const { results } = await db
+    .prepare(
+      `SELECT l.key, l.name, l.url, l.text FROM licenses l WHERE EXISTS (
+         SELECT 1 FROM documents d, json_each(d.data, '$.licenses') j
+         WHERE ${visibilityClause(scope)} AND json_extract(j.value, '$.key') = l.key
+       ) ORDER BY l.name COLLATE NOCASE, l.key`,
+    )
+    .all();
   return results;
 }

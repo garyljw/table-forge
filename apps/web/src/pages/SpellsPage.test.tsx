@@ -2,7 +2,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetRulesCache } from "../api/rules.js";
 import { applyPatch } from "../hooks/useQueryParams.js";
 import { SRD_DOCUMENT } from "../test-fixtures.js";
 import { SpellsPage, spellApiParams } from "./SpellsPage.js";
@@ -11,7 +10,6 @@ const urls: string[] = [];
 
 beforeEach(() => {
   urls.length = 0;
-  resetRulesCache();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string) => {
@@ -117,7 +115,6 @@ describe("spell list filters and the query string", () => {
 
   it("shows an error when the response is malformed", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ nonsense: true }))));
-    resetRulesCache();
     renderAt("/spells");
     expect((await screen.findAllByRole("alert"))[0]?.textContent).toMatch(/unexpected shape/);
   });
