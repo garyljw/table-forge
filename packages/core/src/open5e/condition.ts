@@ -13,6 +13,7 @@ export function normaliseConditions(raw: RawCondition, isIncludedDocument: (docu
     .map((d) => ({
       id: `${d.document}_${raw.key}`,
       documentKey: d.document,
+      dmOnly: false,
       name: cleanText(raw.name),
       description: cleanText(d.desc),
     }));

@@ -3,6 +3,7 @@ import type { Monster } from "@table-forge/shared";
 export const goblin: Monster = {
   id: "srd_goblin",
   documentKey: "srd-2014",
+  dmOnly: false,
   name: "Goblin",
   size: "small",
   type: "humanoid",

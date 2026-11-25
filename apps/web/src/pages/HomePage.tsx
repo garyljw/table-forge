@@ -8,6 +8,7 @@ const SECTIONS = [
   { href: "/backgrounds", title: "Backgrounds", blurb: "Proficiencies, equipment and features." },
   { href: "/feats", title: "Feats", blurb: "Prerequisites and what each feat gives." },
   { href: "/equipment", title: "Equipment", blurb: "Weapons and armour with their stats." },
+  { href: "/magic-items", title: "Magic items", blurb: "Filter by rarity, type and attunement." },
   { href: "/conditions", title: "Conditions", blurb: "What blinded, grappled and the rest actually do." },
   { href: "/credits", title: "Credits and licences", blurb: "Where the rules text comes from." },
 ];

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId } from "./common.js";
+import { DocumentKey, RecordId, DmOnly } from "./common.js";
 
 export const ConditionSummary = z.object({
   id: RecordId,
@@ -9,6 +9,7 @@ export const ConditionSummary = z.object({
 export type ConditionSummary = z.infer<typeof ConditionSummary>;
 
 export const Condition = ConditionSummary.extend({
+  dmOnly: DmOnly,
   description: z.string().min(1),
 });
 export type Condition = z.infer<typeof Condition>;

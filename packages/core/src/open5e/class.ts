@@ -35,6 +35,7 @@ export function normaliseClass(raw: RawClass): ClassDetail {
   const hp = raw.hit_points;
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     parentClass: raw.subclass_of ? { id: raw.subclass_of.key, name: raw.subclass_of.name } : null,

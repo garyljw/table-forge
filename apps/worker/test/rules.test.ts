@@ -12,6 +12,8 @@ import {
   FeatDetailResponse,
   FeatListResponse,
   LicenseListResponse,
+  MagicItemDetailResponse,
+  MagicItemListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
   SpeciesDetailResponse,
@@ -391,12 +393,69 @@ describe("armor", () => {
   });
 });
 
+describe("magic items", () => {
+  it("lists with summary fields, ordered by name", async () => {
+    const list = MagicItemListResponse.parse(await (await get("/magic-items")).json());
+    expect(list.total).toBe(4);
+    expect(list.items.map((i) => [i.name, i.type, i.rarity, i.requiresAttunement])).toEqual([
+      ["Test Blade +1", "weapon", "uncommon", false],
+      ["Test Charm", "wondrous-item", "very-rare", false],
+      ["Test Potion", "potion", "common", false],
+      ["Test Ring", "ring", "rare", true],
+    ]);
+  });
+
+  it("filters by type, rarity, attunement, source and name", async () => {
+    expect(await names("/magic-items?type=ring")).toEqual(["Test Ring"]);
+    expect(await names("/magic-items?rarity=common")).toEqual(["Test Potion"]);
+    expect(await names("/magic-items?attunement=true")).toEqual(["Test Ring"]);
+    expect(await names("/magic-items?attunement=false")).toEqual(["Test Blade +1", "Test Charm", "Test Potion"]);
+    expect(await names("/magic-items?document=tob")).toEqual(["Test Charm"]);
+    expect(await names("/magic-items?q=blade")).toEqual(["Test Blade +1"]);
+    expect(await names("/magic-items?type=ring&rarity=common")).toEqual([]);
+  });
+
+  it("returns the full record and its document", async () => {
+    const detail = MagicItemDetailResponse.parse(await (await get("/magic-items/srd_test-ring")).json());
+    expect(detail.data).toMatchObject({ attunementDetail: "by a wizard", requiresAttunement: true, sentient: false, cursed: false });
+    expect(detail.document.attribution).toBe("SRD ATTRIBUTION TEXT");
+    const charm = MagicItemDetailResponse.parse(await (await get("/magic-items/tob_test-charm")).json());
+    expect(charm.data.cursed).toBe(true);
+  });
+
+  it("never serves a private document's item", async () => {
+    expect(JSON.stringify(await (await get("/magic-items")).json())).not.toContain("Hidden");
+    expect(await names("/magic-items?document=secret-book")).toEqual([]);
+    expect((await get("/magic-items/secret_hidden-idol")).status).toBe(404);
+    expect((await get("/magic-items/srd_nope")).status).toBe(404);
+  });
+});
+
+describe("dmOnly is data only", () => {
+  it("does not hide or change anything yet: flagged records are still served to everyone", async () => {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE spells SET data = json_set(data, '$.dmOnly', json('true')) WHERE id = 'srd_fireball'"),
+      env.DB.prepare("UPDATE magic_items SET data = json_set(data, '$.dmOnly', json('true')) WHERE id = 'srd_test-ring'"),
+    ]);
+    expect(await names("/spells?q=fireball")).toEqual(["Fireball"]);
+    expect(await names("/magic-items?q=ring")).toEqual(["Test Ring"]);
+    const detail = MagicItemDetailResponse.parse(await (await get("/magic-items/srd_test-ring")).json());
+    expect(detail.data.dmOnly).toBe(true);
+  });
+
+  it("reads rows stored without the field as false", async () => {
+    await env.DB.prepare("UPDATE magic_items SET data = json_remove(data, '$.dmOnly') WHERE id = 'srd_test-ring'").run();
+    const detail = MagicItemDetailResponse.parse(await (await get("/magic-items/srd_test-ring")).json());
+    expect(detail.data.dmOnly).toBe(false);
+  });
+});
+
 describe("documents", () => {
   it("lists public documents with counts, for the credits page", async () => {
     const body = DocumentListResponse.parse(await (await get("/documents")).json());
     expect(body.items.map((d) => d.key)).toEqual(["srd-2014", "tob"]);
     const srd = body.items[0];
-    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3 });
+    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3, magic_items: 3 });
     expect(srd?.attribution).toBe("SRD ATTRIBUTION TEXT");
     expect(body.items[1]?.copyrightNotice).toBe("Tome of Beasts Copyright 2016, Kobold Press.");
     expect(JSON.stringify(body)).not.toContain("secret-book");
@@ -486,6 +545,10 @@ describe("bad parameters give 400", () => {
     "/weapons?kind=thrown",
     "/weapons?damageType=a%20b",
     "/armor?category=robe",
+    "/magic-items?type=gem",
+    "/magic-items?rarity=mythic",
+    "/magic-items?attunement=yes",
+    "/magic-items?page=0",
     "/feats?q=",
     "/backgrounds?page=0",
   ])("%s", async (path) => {

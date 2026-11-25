@@ -13,6 +13,7 @@ const results = (over: Partial<Record<RuleTable, TypeResult>> = {}): Record<Rule
   feats: ok(1),
   weapons: ok(37),
   armor: ok(12),
+  magic_items: ok(1500),
   ...over,
 });
 
@@ -28,7 +29,7 @@ describe("checkImport", () => {
 
   it("stops when every type is empty", () => {
     const none = { fetched: 0, valid: 0, failed: 0 };
-    const problems = checkImport({ spells: none, monsters: none, classes: none, conditions: none, species: none, backgrounds: none, feats: none, weapons: none, armor: none }, null);
+    const problems = checkImport({ spells: none, monsters: none, classes: none, conditions: none, species: none, backgrounds: none, feats: none, weapons: none, armor: none, magic_items: none }, null);
     expect(problems).toEqual(["no valid records of any type"]);
   });
 

@@ -19,6 +19,9 @@ import {
   FeatListResponse,
   LicenseListResponse,
   LicenseText,
+  MagicItemDetailResponse,
+  MagicItemListQuery,
+  MagicItemListResponse,
   MonsterDetailResponse,
   MonsterListQuery,
   MonsterListResponse,
@@ -412,6 +415,48 @@ rulesRoutes.get("/armor/:id", async (c) => {
   return c.json(ArmorDetailResponse.parse(found));
 });
 
+interface MagicItemRow extends NamedRow {
+  type: string;
+  rarity: string;
+  requires_attunement: number;
+}
+
+rulesRoutes.get("/magic-items", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, MagicItemListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  if (q.type !== undefined) where.add("t.type = ?", q.type);
+  if (q.rarity !== undefined) where.add("t.rarity = ?", q.rarity);
+  if (q.attunement !== undefined) where.add("t.requires_attunement = ?", q.attunement ? 1 : 0);
+  const { rows, total } = await selectPage<MagicItemRow>(
+    c.env.DB,
+    "magic_items",
+    "t.id, t.document_key, t.name, t.type, t.rarity, t.requires_attunement",
+    where,
+    q.page,
+    q.pageSize,
+  );
+  const items = rows.map((r) => ({
+    id: r.id,
+    documentKey: r.document_key,
+    name: r.name,
+    type: r.type,
+    rarity: r.rarity,
+    requiresAttunement: r.requires_attunement === 1,
+  }));
+  return c.json(MagicItemListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/magic-items/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "magic_items", id.data) : null;
+  if (!found) return notFound(c, "Magic item");
+  return c.json(MagicItemDetailResponse.parse(found));
+});
+
 /** Every document visible to the caller, with how many records of each type it supplies. For the credits page. */
 rulesRoutes.get("/documents", async (c) => {
   const { docs, counts } = await selectDocuments(c.env.DB, documentScopeFor(c.get("identity")));
@@ -432,6 +477,7 @@ rulesRoutes.get("/documents", async (c) => {
         feats: countFor(6, document.key),
         weapons: countFor(7, document.key),
         armor: countFor(8, document.key),
+        magic_items: countFor(9, document.key),
       },
     };
   });

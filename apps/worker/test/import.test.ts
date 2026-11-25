@@ -1,7 +1,7 @@
 import { staleRowStatements } from "@table-forge/core";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { monster, openBundle, runStatements, SEED, seedRules, species, spell } from "./seed.js";
+import { magicItem, monster, openBundle, runStatements, SEED, seedRules, species, spell } from "./seed.js";
 
 const ids = async (table: string): Promise<string[]> =>
   ((await env.DB.prepare(`SELECT id FROM ${table} ORDER BY id`).all()).results as { id: string }[]).map((r) => r.id);
@@ -34,7 +34,7 @@ describe("Open5e import SQL", () => {
   });
 
   it("never touches rows of private documents", async () => {
-    await runStatements(openBundle("run-2", { spells: [], monsters: [], classes: [], conditions: [], species: [], backgrounds: [], feats: [], weapons: [], armor: [] }));
+    await runStatements(openBundle("run-2", { spells: [], monsters: [], classes: [], conditions: [], species: [], backgrounds: [], feats: [], weapons: [], armor: [], magicItems: [] }));
     expect(await ids("spells")).toEqual(["secret_hidden-spell"]);
     expect(await ids("monsters")).toEqual(["secret_hidden-beast"]);
     expect(await ids("classes")).toEqual(["secret_hidden-subclass"]);
@@ -43,6 +43,7 @@ describe("Open5e import SQL", () => {
     expect(await ids("feats")).toEqual(["secret_hidden-feat"]);
     expect(await ids("weapons")).toEqual(["secret_hidden-blade"]);
     expect(await ids("armor")).toEqual(["secret_hidden-plate"]);
+    expect(await ids("magic_items")).toEqual(["secret_hidden-idol"]);
   });
 
   it("is idempotent for the character option tables, and removes vanished rows", async () => {
@@ -53,6 +54,16 @@ describe("Open5e import SQL", () => {
     await runStatements(openBundle("run-4", { species: SEED.species.filter((x) => x.id === "srd_elf"), armor: [] }));
     expect(await ids("species")).toEqual(["secret_hidden-elf", "secret_hidden-species", "srd_elf"]);
     expect(await ids("armor")).toEqual(["secret_hidden-plate"]);
+  });
+
+  it("is idempotent for magic items, removes vanished rows and leaves private ones", async () => {
+    const before = await ids("magic_items");
+    await runStatements(openBundle("run-2"));
+    expect(await ids("magic_items")).toEqual(before);
+    await runStatements(openBundle("run-3", { magicItems: SEED.magicItems.filter((x) => x.id === "srd_test-ring") }));
+    expect(await ids("magic_items")).toEqual(["secret_hidden-idol", "srd_test-ring"]);
+    await runStatements(openBundle("run-4", { magicItems: [magicItem("secret_hidden-idol", "Overwritten", { documentKey: "srd-2014" })] }));
+    expect((await env.DB.prepare("SELECT name FROM magic_items WHERE id = 'secret_hidden-idol'").first<{ name: string }>())?.name).toBe("Hidden Idol");
   });
 
   it("skips a species whose id belongs to a private row", async () => {

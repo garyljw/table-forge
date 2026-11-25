@@ -39,6 +39,7 @@ export function normaliseMonster(raw: RawCreature): Monster {
   const hitDice = (raw.hit_dice ?? "").replace(/\s+/g, "");
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     size: raw.size.key,

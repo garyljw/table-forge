@@ -1,4 +1,4 @@
-import { Armor, Background, Condition, ClassDetail, Feat, LicenseText, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import { Armor, Background, MagicItem, Condition, ClassDetail, Feat, LicenseText, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { describe, expect, it } from "vitest";
 import { isDocumentIncluded, OPEN5E_CONTENT_RULES } from "./config.js";
 import { normaliseArmor } from "./armor.js";
@@ -9,6 +9,7 @@ import { normaliseDocument, normaliseLicense } from "./document.js";
 import { foldName } from "../fold.js";
 import * as fx from "./fixtures.js";
 import { normaliseFeat } from "./feat.js";
+import { normaliseMagicItem } from "./magic-item.js";
 import { normaliseMonster } from "./monster.js";
 import { normaliseSpecies, resolveSpeciesParents } from "./species.js";
 import { normaliseWeapon } from "./weapon.js";
@@ -284,6 +285,7 @@ describe("SQL builder", () => {
         feats: [normaliseFeat(fx.grappler)],
         weapons: [normaliseWeapon(fx.longsword)],
         armor: [normaliseArmor(fx.chainMail)],
+        magicItems: [normaliseMagicItem(fx.testBlade)],
       },
       "run-1",
     );
@@ -295,13 +297,49 @@ describe("SQL builder", () => {
     expect(spell).toContain("ON CONFLICT(id) DO UPDATE");
     expect(spell).toContain("origin = 'open5e'");
     expect(statements.filter((s) => s.startsWith("INSERT INTO classes"))).toHaveLength(2);
-    for (const table of ["species", "backgrounds", "feats", "weapons", "armor"]) {
+    for (const table of ["species", "backgrounds", "feats", "weapons", "armor", "magic_items"]) {
       const insert = statements.find((s) => s.startsWith(`INSERT INTO ${table} `));
       expect(insert).toContain("origin = 'open5e'");
       expect(insert).toContain("ON CONFLICT(id) DO UPDATE");
     }
     expect(statements.find((s) => s.startsWith("INSERT INTO weapons"))).toContain("'martial', 'melee', '1d8', 'slashing'");
     expect(statements.filter((s) => s.startsWith("DELETE FROM armor"))).toHaveLength(1);
+  });
+});
+
+describe("magic items", () => {
+  it("normalises a weapon with a base item", () => {
+    const m = normaliseMagicItem(fx.testBlade);
+    expect(MagicItem.parse(m)).toEqual(m);
+    expect(m).toMatchObject({
+      id: "srd_blade",
+      documentKey: "srd-2014",
+      type: "weapon",
+      rarity: "uncommon",
+      requiresAttunement: false,
+      baseItem: "longsword",
+      attunementDetail: null,
+      sentient: false,
+      cursed: false,
+      dmOnly: false,
+    });
+    expect(m.description).toBe("You have a +1 bonus to attack and damage rolls made with this magic weapon.");
+  });
+  it("strips 'requires attunement' from the detail", () => {
+    const m = normaliseMagicItem(fx.testCharm);
+    expect(m).toMatchObject({ type: "wondrous-item", rarity: "rare", requiresAttunement: true, attunementDetail: "by a Cleric", baseItem: null });
+    expect(normaliseMagicItem({ ...fx.testCharm, attunement_detail: "requires attunement" }).attunementDetail).toBeNull();
+    expect(normaliseMagicItem({ ...fx.testCharm, requires_attunement: false }).attunementDetail).toBeNull();
+  });
+  it("maps shields to armor, ammunition to weapon, and a missing rarity to varies", () => {
+    expect(normaliseMagicItem({ ...fx.testCharm, category: { key: "shield" }, armor: { name: "Shield" } })).toMatchObject({ type: "armor", baseItem: "shield" });
+    expect(normaliseMagicItem({ ...fx.testCharm, category: { key: "ammunition" } }).type).toBe("weapon");
+    expect(normaliseMagicItem({ ...fx.testCharm, rarity: null }).rarity).toBe("varies");
+  });
+  it("rejects an unknown category or rarity", () => {
+    expect(() => normaliseMagicItem({ ...fx.testCharm, category: { key: "gem" } })).toThrow('unknown magic item category "gem"');
+    expect(() => normaliseMagicItem({ ...fx.testCharm, category: null })).toThrow("unknown magic item category");
+    expect(() => normaliseMagicItem({ ...fx.testCharm, rarity: { key: "mythic" } })).toThrow('unknown rarity "mythic"');
   });
 });
 

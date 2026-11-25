@@ -41,8 +41,10 @@ import {
   isDocumentIncluded,
   isStatementTooLarge,
   licenseStatement,
+  magicItemStatement,
   monsterStatement,
   normaliseLicense,
+  normaliseMagicItem,
   speciesStatement,
   spellStatement,
   staleRowStatements,
@@ -69,11 +71,12 @@ import {
   type RawDocument,
   type RawFeat,
   type RawLicense,
+  type RawMagicItem,
   type RawSpecies,
   type RawSpell,
   type RawWeapon,
 } from "@table-forge/core";
-import { RULE_TABLES, Armor, Background, ClassDetail, Condition, Feat, LicenseText, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import { RULE_TABLES, Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workerDir = path.join(root, "apps/worker");
@@ -238,6 +241,7 @@ async function main(): Promise<void> {
     feats: newStats(),
     weapons: newStats(),
     armor: newStats(),
+    magic_items: newStats(),
   };
   console.log("");
 
@@ -261,6 +265,9 @@ async function main(): Promise<void> {
   const rawFeats = ofIncluded(await fetchAll<RawFeat>("feats"));
   const rawWeapons = ofIncluded(await fetchAll<RawWeapon>("weapons"));
   const rawArmor = ofIncluded(await fetchAll<RawArmor>("armor"));
+  // `/magicitems/` ignores the document filter and returns every game system, so fetch it whole and keep
+  // the included documents (the 2024 SRD's magic items drop out here, by the same rules as everything else).
+  const rawMagicItems = ofIncluded(await fetchAll<RawMagicItem>("magicitems"));
 
   const spells = convert("spells", rawSpells, stats.spells, (r) => [normaliseSpell(r)], Spell, (r) => spellStatement(r, run), includedKeys);
   const monsters = convert("monsters", rawCreatures, stats.monsters, (r) => [normaliseMonster(r)], Monster, (r) => monsterStatement(r, run), includedKeys);
@@ -336,6 +343,7 @@ async function main(): Promise<void> {
   const feats = convert("feats", rawFeats, stats.feats, (r) => [normaliseFeat(r)], Feat, (r) => featStatement(r, run), includedKeys);
   const weapons = convert("weapons", rawWeapons, stats.weapons, (r) => [normaliseWeapon(r)], Weapon, (r) => weaponStatement(r, run), includedKeys);
   const armor = convert("armor", rawArmor, stats.armor, (r) => [normaliseArmor(r)], Armor, (r) => armorStatement(r, run), includedKeys);
+  const magicItems = convert("magic items", rawMagicItems, stats.magic_items, (r) => [normaliseMagicItem(r)], MagicItem, (r) => magicItemStatement(r, run), includedKeys);
 
   const whereArgs = remote ? ["--remote", "--config", targetConfig] : ["--local"];
   const where = remote ? `REMOTE ${target}` : "local";
@@ -382,6 +390,7 @@ async function main(): Promise<void> {
       feats: summary(stats.feats),
       weapons: summary(stats.weapons),
       armor: summary(stats.armor),
+      magic_items: summary(stats.magic_items),
     },
     existing,
     { maxFailureRate: 0.05, maxDropRate: 0.2, force },
@@ -393,7 +402,7 @@ async function main(): Promise<void> {
   }
 
   // Only documents that actually supply a record are stored (and credited).
-  const used = new Set([...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor].map((c) => c.record.documentKey));
+  const used = new Set([...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor, ...magicItems].map((c) => c.record.documentKey));
   const documents = included
     .filter((d) => used.has(d.key))
     .map((d) => {
@@ -414,7 +423,7 @@ async function main(): Promise<void> {
   const statements = [
     ...documents.map((d) => d.statement),
     ...licenses.map((l) => l.statement),
-    ...[...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor].map((c) => c.statement),
+    ...[...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor, ...magicItems].map((c) => c.statement),
     ...staleRowStatements(run),
   ];
   mkdirSync(outDir, { recursive: true });
@@ -422,10 +431,10 @@ async function main(): Promise<void> {
   writeFileSync(sqlFile, statements.join("\n") + "\n");
   console.log(`\nWrote ${statements.length} statements to ${path.relative(root, sqlFile)} (run ${run})`);
 
-  console.log("\nCounts per document (spells / monsters / classes / conditions / species / backgrounds / feats / weapons / armor):");
+  console.log("\nCounts per document (spells / monsters / classes / conditions / species / backgrounds / feats / weapons / armor / magic items):");
   for (const d of documents) {
     const n = (s: Stats) => s.byDocument.get(d.record.key) ?? 0;
-    const row = [stats.spells, stats.monsters, stats.classes, stats.conditions, stats.species, stats.backgrounds, stats.feats, stats.weapons, stats.armor].map(n);
+    const row = [stats.spells, stats.monsters, stats.classes, stats.conditions, stats.species, stats.backgrounds, stats.feats, stats.weapons, stats.armor, stats.magic_items].map(n);
     console.log(`  ${d.record.key.padEnd(24)} ${row.join(" / ")}`);
   }
   console.log("\nValidation failures:");
@@ -447,6 +456,7 @@ async function main(): Promise<void> {
     feats: feats.length,
     weapons: weapons.length,
     armor: armor.length,
+    magic_items: magicItems.length,
   };
   let skipped = 0;
   for (const [table, want] of Object.entries(expected)) {

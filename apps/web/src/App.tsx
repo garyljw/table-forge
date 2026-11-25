@@ -12,12 +12,14 @@ import {
   BackgroundDetailPage,
   ClassDetailPage,
   FeatDetailPage,
+  MagicItemDetailPage,
   MonsterDetailPage,
   SpeciesDetailPage,
   SpellDetailPage,
   WeaponDetailPage,
 } from "./pages/DetailPages.js";
 import { HomePage } from "./pages/HomePage.js";
+import { MagicItemsPage } from "./pages/MagicItemsPage.js";
 import { MonstersPage } from "./pages/MonstersPage.js";
 import { RacesPage } from "./pages/RacesPage.js";
 import { SpellsPage } from "./pages/SpellsPage.js";
@@ -30,6 +32,7 @@ const NAV = [
   { href: "/backgrounds", label: "Backgrounds" },
   { href: "/feats", label: "Feats" },
   { href: "/equipment", label: "Equipment" },
+  { href: "/magic-items", label: "Magic items" },
   { href: "/conditions", label: "Conditions" },
   { href: "/credits", label: "Credits" },
 ];
@@ -120,6 +123,8 @@ export function App() {
             <Route path="/equipment" component={EquipmentPage} />
             <Route path="/equipment/weapons/:id">{(p: { id: string }) => <WeaponDetailPage id={p.id} />}</Route>
             <Route path="/equipment/armor/:id">{(p: { id: string }) => <ArmorDetailPage id={p.id} />}</Route>
+            <Route path="/magic-items" component={MagicItemsPage} />
+            <Route path="/magic-items/:id">{(p: { id: string }) => <MagicItemDetailPage id={p.id} />}</Route>
             <Route path="/conditions" component={ConditionsPage} />
             <Route path="/credits" component={CreditsPage} />
             <Route component={NotFound} />

@@ -13,6 +13,7 @@ export function normaliseSpecies(raw: RawSpecies): Species {
   const isSub = raw.is_subspecies === true || parentKey !== null;
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     // The name is provisional; resolveSpeciesParents replaces it with the stored parent's real name.

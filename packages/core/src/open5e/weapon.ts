@@ -24,6 +24,7 @@ export function normaliseWeapon(raw: RawWeapon): Weapon {
   if (raw.distance_unit && raw.distance_unit !== "feet") throw new Error(`unexpected distance unit "${raw.distance_unit}"`);
   return {
     id: raw.key,
+    dmOnly: false,
     documentKey: raw.document.key,
     name: cleanText(raw.name),
     category: raw.is_simple ? "simple" : "martial",

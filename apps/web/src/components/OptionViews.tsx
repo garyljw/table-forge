@@ -1,6 +1,6 @@
-import type { Armor, Background, Feat, SpeciesDetailResponse, Weapon } from "@table-forge/shared";
+import type { Armor, Background, Feat, MagicItem, SpeciesDetailResponse, Weapon } from "@table-forge/shared";
 import { Link } from "wouter";
-import { capitalise, weaponDamageLabel } from "../format.js";
+import { capitalise, magicItemSubtitle, weaponDamageLabel } from "../format.js";
 import { Markdown } from "./Markdown.js";
 
 export function SpeciesView({ detail }: { detail: SpeciesDetailResponse }) {
@@ -138,6 +138,23 @@ export function ArmorView({ armor: a }: { armor: Armor }) {
           <dd>{a.stealthDisadvantage ? "Disadvantage" : "No penalty"}</dd>
         </div>
       </dl>
+    </article>
+  );
+}
+
+export function MagicItemView({ item: m }: { item: MagicItem }) {
+  return (
+    <article className="card">
+      <h1>{m.name}</h1>
+      <p className="subtitle">
+        <em>{magicItemSubtitle(m)}</em>
+      </p>
+      {(m.sentient || m.cursed) && (
+        <p>
+          {m.sentient && <span className="tag">Sentient</span>} {m.cursed && <span className="tag">Cursed</span>}
+        </p>
+      )}
+      {m.description !== "" && <Markdown>{m.description}</Markdown>}
     </article>
   );
 }

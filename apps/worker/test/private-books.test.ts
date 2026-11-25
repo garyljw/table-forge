@@ -33,6 +33,7 @@ const TABLES = [
   { path: "feats", name: "Hidden Feat", id: "secret_hidden-feat" },
   { path: "weapons", name: "Hidden Blade", id: "secret_hidden-blade" },
   { path: "armor", name: "Hidden Plate", id: "secret_hidden-plate" },
+  { path: "magic-items", name: "Hidden Idol", id: "secret_hidden-idol" },
 ];
 
 describe("a verified Access user", () => {

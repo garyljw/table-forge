@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId } from "./common.js";
+import { DocumentKey, RecordId, DmOnly } from "./common.js";
 
 /** One block of a background: a feature, equipment, skill proficiencies, languages and so on, as written. */
 export const BackgroundBenefit = z.object({
@@ -18,6 +18,7 @@ export const BackgroundSummary = z.object({
 export type BackgroundSummary = z.infer<typeof BackgroundSummary>;
 
 export const Background = BackgroundSummary.extend({
+  dmOnly: DmOnly,
   description: z.string(),
   benefits: z.array(BackgroundBenefit),
 });

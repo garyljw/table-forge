@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { resolveSubclassParents } from "./class.js";
 
 const cls = (id: string, name: string, parent: { id: string | null; name: string } | null): ClassDetail => ({
-  id, documentKey: id.split("_")[0] ?? "x", name, parentClass: parent, hitDice: null, casterType: null,
+  id, dmOnly: false, documentKey: id.split("_")[0] ?? "x", name, parentClass: parent, hitDice: null, casterType: null,
   description: "", hitPoints: null, savingThrows: [], primaryAbilities: [], proficiencies: null,
   startingEquipment: null, features: [], table: [],
 });

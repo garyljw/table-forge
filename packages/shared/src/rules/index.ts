@@ -6,6 +6,7 @@ export * from "./common.js";
 export * from "./condition.js";
 export * from "./document.js";
 export * from "./feat.js";
+export * from "./magic-item.js";
 export * from "./monster.js";
 export * from "./species.js";
 export * from "./spell.js";
