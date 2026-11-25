@@ -23,8 +23,7 @@ import {
   MonsterListQuery,
   MonsterListResponse,
   RecordId,
-  RULE_TABLES,
-  SourceDocument,
+    SourceDocument,
   SpeciesDetailResponse,
   SpeciesListQuery,
   SpeciesListResponse,
@@ -38,7 +37,8 @@ import {
 } from "@table-forge/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../env.js";
-import { pageEnvelope, selectChildren, selectDetail, selectPage, Where } from "./db.js";
+import { documentScopeFor } from "../auth/permissions.js";
+import { pageEnvelope, selectChildren, selectDetail, selectDocuments, selectLicenses, selectPage, Where } from "./db.js";
 import { notFound, parseQuery } from "./query.js";
 
 /** `/api/rules/*`: the read-only rules browser. Mounted under `/api`, behind whatever auth middleware that gets. */
@@ -58,10 +58,11 @@ interface SpellRow {
 }
 
 rulesRoutes.get("/spells", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, SpellListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   if (q.level !== undefined) where.add("t.level = ?", q.level);
   if (q.school !== undefined) where.add("t.school = ?", q.school);
   if (q.class !== undefined) where.add("instr(t.classes, ?) > 0", `,${q.class},`);
@@ -91,8 +92,9 @@ rulesRoutes.get("/spells", async (c) => {
 });
 
 rulesRoutes.get("/spells/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "spells", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "spells", id.data) : null;
   if (!found) return notFound(c, "Spell");
   return c.json(SpellDetailResponse.parse(found));
 });
@@ -109,10 +111,11 @@ interface MonsterRow {
 }
 
 rulesRoutes.get("/monsters", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, MonsterListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   if (q.type !== undefined) where.add("t.type = ?", q.type);
   if (q.size !== undefined) where.add("t.size = ?", q.size);
   if (q.crMin !== undefined) where.add("t.challenge_rating >= ?", q.crMin);
@@ -139,8 +142,9 @@ rulesRoutes.get("/monsters", async (c) => {
 });
 
 rulesRoutes.get("/monsters/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "monsters", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "monsters", id.data) : null;
   if (!found) return notFound(c, "Monster");
   return c.json(MonsterDetailResponse.parse(found));
 });
@@ -168,10 +172,11 @@ const classSummary = (r: ClassRow): ClassSummary => ({
 });
 
 rulesRoutes.get("/classes", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, ClassListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   if (q.kind === "class") where.add("t.parent_name IS NULL");
   if (q.kind === "subclass") where.add("t.parent_name IS NOT NULL");
   if (q.parent !== undefined) where.add("t.parent_id = ?", q.parent);
@@ -180,10 +185,11 @@ rulesRoutes.get("/classes", async (c) => {
 });
 
 rulesRoutes.get("/classes/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "classes", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "classes", id.data) : null;
   if (!id.success || !found) return notFound(c, "Class");
-  const subclasses = await selectChildren<ClassRow>(c.env.DB, "classes", CLASS_COLUMNS, id.data);
+  const subclasses = await selectChildren<ClassRow>(c.env.DB, scope, "classes", CLASS_COLUMNS, id.data);
   return c.json(ClassDetailResponse.parse({ ...found, subclasses: subclasses.map(classSummary) }));
 });
 
@@ -194,18 +200,20 @@ interface ConditionRow {
 }
 
 rulesRoutes.get("/conditions", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, ConditionListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   const { rows, total } = await selectPage<ConditionRow>(c.env.DB, "conditions", "t.id, t.document_key, t.name", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name }));
   return c.json(ConditionListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
 });
 
 rulesRoutes.get("/conditions/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "conditions", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "conditions", id.data) : null;
   if (!found) return notFound(c, "Condition");
   return c.json(ConditionDetailResponse.parse(found));
 });
@@ -229,10 +237,11 @@ const speciesSummary = (r: SpeciesRow): SpeciesSummary => ({
 });
 
 rulesRoutes.get("/species", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, SpeciesListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   if (q.kind === "species") where.add("t.parent_name IS NULL");
   if (q.kind === "subspecies") where.add("t.parent_name IS NOT NULL");
   if (q.parent !== undefined) where.add("t.parent_id = ?", q.parent);
@@ -241,10 +250,11 @@ rulesRoutes.get("/species", async (c) => {
 });
 
 rulesRoutes.get("/species/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "species", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "species", id.data) : null;
   if (!id.success || !found) return notFound(c, "Species");
-  const subspecies = await selectChildren<SpeciesRow>(c.env.DB, "species", SPECIES_COLUMNS, id.data);
+  const subspecies = await selectChildren<SpeciesRow>(c.env.DB, scope, "species", SPECIES_COLUMNS, id.data);
   return c.json(SpeciesDetailResponse.parse({ ...found, subspecies: subspecies.map(speciesSummary) }));
 });
 
@@ -255,27 +265,30 @@ interface NamedRow {
 }
 
 rulesRoutes.get("/backgrounds", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, BackgroundListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   const { rows, total } = await selectPage<NamedRow>(c.env.DB, "backgrounds", "t.id, t.document_key, t.name", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name }));
   return c.json(BackgroundListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
 });
 
 rulesRoutes.get("/backgrounds/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "backgrounds", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "backgrounds", id.data) : null;
   if (!found) return notFound(c, "Background");
   return c.json(BackgroundDetailResponse.parse(found));
 });
 
 rulesRoutes.get("/feats", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, FeatListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   const { rows, total } = await selectPage<NamedRow & { prerequisite: string | null }>(
     c.env.DB,
     "feats",
@@ -289,8 +302,9 @@ rulesRoutes.get("/feats", async (c) => {
 });
 
 rulesRoutes.get("/feats/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "feats", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "feats", id.data) : null;
   if (!found) return notFound(c, "Feat");
   return c.json(FeatDetailResponse.parse(found));
 });
@@ -303,10 +317,11 @@ interface WeaponRow extends NamedRow {
 }
 
 rulesRoutes.get("/weapons", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, WeaponListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   if (q.category !== undefined) where.add("t.category = ?", q.category);
   if (q.kind !== undefined) where.add("t.kind = ?", q.kind);
   if (q.damageType !== undefined) where.add("t.damage_type = ?", q.damageType);
@@ -331,8 +346,9 @@ rulesRoutes.get("/weapons", async (c) => {
 });
 
 rulesRoutes.get("/weapons/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "weapons", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "weapons", id.data) : null;
   if (!found) return notFound(c, "Weapon");
   return c.json(WeaponDetailResponse.parse(found));
 });
@@ -348,10 +364,11 @@ interface ArmorRow extends NamedRow {
 }
 
 rulesRoutes.get("/armor", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const parsed = parseQuery(c, ArmorListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where().nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document);
   if (q.category !== undefined) where.add("t.category = ?", q.category);
   const { rows, total } = await selectPage<ArmorRow>(
     c.env.DB,
@@ -381,22 +398,19 @@ rulesRoutes.get("/armor", async (c) => {
 });
 
 rulesRoutes.get("/armor/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
   const id = RecordId.safeParse(c.req.param("id"));
-  const found = id.success ? await selectDetail(c.env.DB, "armor", id.data) : null;
+  const found = id.success ? await selectDetail(c.env.DB, scope, "armor", id.data) : null;
   if (!found) return notFound(c, "Armor");
   return c.json(ArmorDetailResponse.parse(found));
 });
 
-/** Every public document, with how many records of each type it supplies. For the credits page. */
+/** Every document visible to the caller, with how many records of each type it supplies. For the credits page. */
 rulesRoutes.get("/documents", async (c) => {
-  const db = c.env.DB;
-  const [docs, ...counts] = await db.batch([
-    db.prepare("SELECT data FROM documents WHERE visibility = 'public' ORDER BY display_name COLLATE NOCASE, key"),
-    ...RULE_TABLES.map((t) => db.prepare(`SELECT document_key, COUNT(*) AS n FROM ${t} GROUP BY document_key`)),
-  ]);
+  const { docs, counts } = await selectDocuments(c.env.DB, documentScopeFor(c.get("identity")));
   const countFor = (index: number, key: string) =>
     Number((counts[index]?.results as { document_key: string; n: number }[] | undefined)?.find((r) => r.document_key === key)?.n ?? 0);
-  const items = (docs?.results ?? []).map((row) => {
+  const items = docs.map((row) => {
     const document = SourceDocument.parse(JSON.parse((row as { data: string }).data));
     return {
       ...document,
@@ -417,13 +431,8 @@ rulesRoutes.get("/documents", async (c) => {
   return c.json(DocumentListResponse.parse({ items }));
 });
 
-/** Full licence texts (OGL 1.0a, CC-BY-4.0, ...) for licences that a public document uses. Documents refer to them by licence key. */
+/** Full licence texts (OGL 1.0a, CC-BY-4.0, ...) for licences that a visible document uses. Documents refer to them by licence key. */
 rulesRoutes.get("/licenses", async (c) => {
-  const { results } = await c.env.DB.prepare(
-      `SELECT l.key, l.name, l.url, l.text FROM licenses l WHERE EXISTS (
-         SELECT 1 FROM documents d, json_each(d.data, '$.licenses') j
-         WHERE d.visibility = 'public' AND json_extract(j.value, '$.key') = l.key
-       ) ORDER BY l.name COLLATE NOCASE, l.key`,
-    ).all();
+  const results = await selectLicenses(c.env.DB, documentScopeFor(c.get("identity")));
   return c.json(LicenseListResponse.parse({ items: results.map((r) => LicenseText.parse(r)) }));
 });

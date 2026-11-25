@@ -50,7 +50,7 @@ function DocumentEntry({ doc }: { doc: Doc }) {
         <div>
           <dt>Licence</dt>
           <dd>
-            {doc.licenses.length === 0 && "Not stated"}
+            {doc.licenses.length === 0 && (doc.visibility === "private" ? "Owner's private copy, shown only to signed-in players" : "Not stated")}
             {doc.licenses.map((l, i) => (
               <span key={l.key}>
                 {i > 0 && ", "}

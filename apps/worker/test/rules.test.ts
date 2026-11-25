@@ -23,12 +23,12 @@ import {
 } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { authedFetch } from "./auth.js";
+import { getAs, NO_PRIVATE_ACCESS } from "./identities.js";
 import { klass, openBundle, runStatements, SEED, seedRules, spell } from "./seed.js";
 
-async function get(path: string): Promise<Response> {
-  return authedFetch(`https://example.com/api/rules${path}`);
-}
+// These tests describe what a caller WITHOUT private-book access sees (the "public view"). Callers
+// who may read private books are covered in private-books.test.ts.
+const get = (path: string): Promise<Response> => getAs(NO_PRIVATE_ACCESS, path);
 
 async function names(path: string): Promise<string[]> {
   const res = await get(path);
@@ -276,9 +276,9 @@ describe("species", () => {
 
   it("lists subspecies in a fixed query, and an unknown table is refused", async () => {
     const { selectChildren } = await import("../src/rules/db.js");
-    const rows = await selectChildren<{ name: string }>(env.DB, "species", "t.name", "srd_elf");
+    const rows = await selectChildren<{ name: string }>(env.DB, { includePrivate: false }, "species", "t.name", "srd_elf");
     expect(rows.map((r) => r.name)).toEqual(["High Elf", "Wood Elf"]);
-    await expect(selectChildren(env.DB, "spells; DROP TABLE species" as never, "t.name", "x")).rejects.toThrow(/no children query/);
+    await expect(selectChildren(env.DB, { includePrivate: false }, "spells; DROP TABLE species" as never, "t.name", "x")).rejects.toThrow(/no children query/);
     expect(await names("/species")).toContain("Elf");
   });
 

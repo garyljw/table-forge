@@ -67,6 +67,13 @@ describe("Open5e import SQL", () => {
     expect(row).toEqual({ name: "Hidden Fire Spell", document_key: "secret-book", import_run: null });
   });
 
+  it("cannot overwrite or flip a private document that shares its key", async () => {
+    const hijack = { ...SEED.documents[0]!, key: "secret-book", displayName: "Hijacked", origin: "open5e" as const, visibility: "public" as const };
+    await runStatements(openBundle("run-2", { documents: [...SEED.documents.filter((d) => d.origin === "open5e"), hijack] }));
+    const row = await env.DB.prepare("SELECT origin, visibility, display_name FROM documents WHERE key = 'secret-book'").first();
+    expect(row).toEqual({ origin: "private", visibility: "private", display_name: "Secret Book" });
+  });
+
   it("skips records for a document that is not an Open5e one", async () => {
     await runStatements(openBundle("run-2", { monsters: [monster("x_intruder", "Intruder", { documentKey: "secret-book" })] }));
     expect(await ids("monsters")).not.toContain("x_intruder");

@@ -4,10 +4,14 @@ import type { AppEnv } from "../env.js";
 
 /**
  * The verified Cloudflare Access identity of the caller.
- * TODO: Access service tokens carry no email claim. Display access (the TV) will be specified
- * separately before it is built; until then every caller must be a person with an email.
+ *
+ * `kind: "user"` means a person who signed in through Access, proven by a validated JWT carrying an
+ * email. It is the ONLY kind that exists today. Access service tokens carry no email claim and are
+ * rejected by the middleware. Display access (the TV) will be specified separately before it is
+ * built; it must arrive as a different `kind`, never as a "user", so that permission checks in
+ * `permissions.ts` (which test for `kind === "user"`) deny it by default.
  */
-export type Identity = { email: string; sub: string };
+export type Identity = { kind: "user"; email: string; sub: string };
 
 const HEADER = "cf-access-jwt-assertion";
 const TOLERANCE_SECONDS = 30;
@@ -54,7 +58,7 @@ function devIdentity(env: AppEnv["Bindings"], req: Request): Identity | null {
   if (!email) return null;
   if (!LOCAL_HOSTS.has(new URL(req.url).hostname)) return null;
   if (req.headers.has("cf-ray")) return null;
-  return { email, sub: "dev-bypass" };
+  return { kind: "user", email, sub: "dev-bypass" };
 }
 
 /**
@@ -91,7 +95,7 @@ export const requireAccess = (publicPaths: readonly string[]) =>
     });
     const email = typeof payload.email === "string" ? payload.email : "";
     if (!email) return deny(c, "token has no email", console.warn);
-    c.set("identity", { email, sub: payload.sub as string });
+    c.set("identity", { kind: "user", email, sub: payload.sub as string });
   } catch (err) {
     // The key set could not be fetched or parsed (network, timeout, non-200, bad body): that is our
     // upstream failing, not a bad token, so say 503 rather than 401.
