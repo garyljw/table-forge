@@ -29,6 +29,9 @@ import {
   RollTableDetailResponse,
   RollTableListQuery,
   RollTableListResponse,
+  RuleSectionDetailResponse,
+  RuleSectionListQuery,
+  RuleSectionListResponse,
   SourceDocument,
   SpeciesDetailResponse,
   SpeciesListQuery,
@@ -485,6 +488,26 @@ rulesRoutes.get("/roll-tables/:id", async (c) => {
   return c.json(RollTableDetailResponse.parse(found));
 });
 
+rulesRoutes.get("/rule-sections", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, RuleSectionListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  if (q.category !== undefined) where.add("t.category = ?", q.category);
+  const { rows, total } = await selectPage<NamedRow & { category: string }>(c.env.DB, "rule_sections", "t.id, t.document_key, t.name, t.category", where, q.page, q.pageSize);
+  const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, category: r.category }));
+  return c.json(RuleSectionListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/rule-sections/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "rule_sections", id.data) : null;
+  if (!found) return notFound(c, "Rules section");
+  return c.json(RuleSectionDetailResponse.parse(found));
+});
+
 /** Every document visible to the caller, with how many records of each type it supplies. For the credits page. */
 rulesRoutes.get("/documents", async (c) => {
   const { docs, counts } = await selectDocuments(c.env.DB, documentScopeFor(c.get("identity")));
@@ -507,6 +530,7 @@ rulesRoutes.get("/documents", async (c) => {
         armor: countFor(8, document.key),
         magic_items: countFor(9, document.key),
         roll_tables: countFor(10, document.key),
+        rule_sections: countFor(11, document.key),
       },
     };
   });

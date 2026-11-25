@@ -18,6 +18,8 @@ import {
   MonsterListResponse,
   RollTableDetailResponse,
   RollTableListResponse,
+  RuleSectionDetailResponse,
+  RuleSectionListResponse,
   SpeciesDetailResponse,
   SpeciesListResponse,
   SpellDetailResponse,
@@ -459,6 +461,33 @@ describe("roll tables", () => {
   });
 });
 
+describe("rule sections", () => {
+  it("lists and filters by category, source and name", async () => {
+    const list = RuleSectionListResponse.parse(await (await get("/rule-sections")).json());
+    expect(list.items.map((t) => [t.name, t.category])).toEqual([
+      ["Test Fever", "disease"],
+      ["Test Flanking", "variant-rule"],
+      ["Test Pit", "trap"],
+    ]);
+    expect(await names("/rule-sections?category=trap")).toEqual(["Test Pit"]);
+    expect(await names("/rule-sections?document=tob")).toEqual(["Test Fever"]);
+    expect(await names("/rule-sections?q=flank")).toEqual(["Test Flanking"]);
+  });
+
+  it("returns the body and related ids; rows stored without relatedIds read as empty", async () => {
+    const detail = RuleSectionDetailResponse.parse(await (await get("/rule-sections/srd_test-flanking")).json());
+    expect(detail.data).toMatchObject({ body: "Flank **well**.", relatedIds: ["srd_wizard"] });
+    await env.DB.prepare("UPDATE rule_sections SET data = json_remove(data, '$.relatedIds') WHERE id = 'srd_test-pit'").run();
+    expect(RuleSectionDetailResponse.parse(await (await get("/rule-sections/srd_test-pit")).json()).data.relatedIds).toEqual([]);
+  });
+
+  it("never serves a private document's section", async () => {
+    expect(JSON.stringify(await (await get("/rule-sections")).json())).not.toContain("Hidden");
+    expect((await get("/rule-sections/secret_hidden-section")).status).toBe(404);
+    expect((await get("/rule-sections/srd_nope")).status).toBe(404);
+  });
+});
+
 describe("dmOnly is data only", () => {
   it("does not hide or change anything yet: flagged records are still served to everyone", async () => {
     await env.DB.batch([
@@ -483,7 +512,7 @@ describe("documents", () => {
     const body = DocumentListResponse.parse(await (await get("/documents")).json());
     expect(body.items.map((d) => d.key)).toEqual(["srd-2014", "tob"]);
     const srd = body.items[0];
-    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3, magic_items: 3, roll_tables: 2 });
+    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3, magic_items: 3, roll_tables: 2, rule_sections: 2 });
     expect(srd?.attribution).toBe("SRD ATTRIBUTION TEXT");
     expect(body.items[1]?.copyrightNotice).toBe("Tome of Beasts Copyright 2016, Kobold Press.");
     expect(JSON.stringify(body)).not.toContain("secret-book");
@@ -579,6 +608,8 @@ describe("bad parameters give 400", () => {
     "/magic-items?page=0",
     "/roll-tables?category=bogus",
     "/roll-tables?q=",
+    "/rule-sections?category=bogus",
+    "/rule-sections?pageSize=0",
     "/feats?q=",
     "/backgrounds?page=0",
   ])("%s", async (path) => {

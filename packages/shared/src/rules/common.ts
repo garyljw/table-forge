@@ -30,5 +30,5 @@ export type NamedRef = z.infer<typeof NamedRef>;
 export const DmOnly = z.boolean().default(false);
 
 /** The record tables of the rules data. The one list every query and import statement works from. */
-export const RULE_TABLES = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables"] as const;
+export const RULE_TABLES = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections"] as const;
 export type RuleTable = (typeof RULE_TABLES)[number];

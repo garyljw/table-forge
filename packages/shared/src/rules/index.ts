@@ -9,6 +9,7 @@ export * from "./feat.js";
 export * from "./magic-item.js";
 export * from "./monster.js";
 export * from "./roll-table.js";
+export * from "./rule-section.js";
 export * from "./species.js";
 export * from "./spell.js";
 export * from "./weapon.js";

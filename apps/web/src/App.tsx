@@ -15,6 +15,7 @@ import {
   MagicItemDetailPage,
   MonsterDetailPage,
   RollTableDetailPage,
+  RuleSectionDetailPage,
   SpeciesDetailPage,
   SpellDetailPage,
   WeaponDetailPage,
@@ -24,6 +25,7 @@ import { MagicItemsPage } from "./pages/MagicItemsPage.js";
 import { MonstersPage } from "./pages/MonstersPage.js";
 import { RacesPage } from "./pages/RacesPage.js";
 import { RollTablesPage } from "./pages/RollTablesPage.js";
+import { RuleSectionsPage } from "./pages/RuleSectionsPage.js";
 import { SpellsPage } from "./pages/SpellsPage.js";
 
 const NAV = [
@@ -36,6 +38,7 @@ const NAV = [
   { href: "/equipment", label: "Equipment" },
   { href: "/magic-items", label: "Magic items" },
   { href: "/roll-tables", label: "Roll tables" },
+  { href: "/rules", label: "Rules" },
   { href: "/conditions", label: "Conditions" },
   { href: "/credits", label: "Credits" },
 ];
@@ -130,6 +133,8 @@ export function App() {
             <Route path="/magic-items/:id">{(p: { id: string }) => <MagicItemDetailPage id={p.id} />}</Route>
             <Route path="/roll-tables" component={RollTablesPage} />
             <Route path="/roll-tables/:id">{(p: { id: string }) => <RollTableDetailPage id={p.id} />}</Route>
+            <Route path="/rules" component={RuleSectionsPage} />
+            <Route path="/rules/:id">{(p: { id: string }) => <RuleSectionDetailPage id={p.id} />}</Route>
             <Route path="/conditions" component={ConditionsPage} />
             <Route path="/credits" component={CreditsPage} />
             <Route component={NotFound} />

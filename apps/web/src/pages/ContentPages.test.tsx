@@ -5,12 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { magicItemSubtitle } from "../format.js";
 import { SRD_DOCUMENT } from "../test-fixtures.js";
 import { rollLabel } from "../components/RollTableView.js";
-import { MagicItemDetailPage, RollTableDetailPage } from "./DetailPages.js";
+import { MagicItemDetailPage, RollTableDetailPage, RuleSectionDetailPage } from "./DetailPages.js";
 import { MagicItemsPage, magicItemApiParams } from "./MagicItemsPage.js";
 import { RollTablesPage, rollTableApiParams } from "./RollTablesPage.js";
+import { RuleSectionsPage, ruleSectionApiParams } from "./RuleSectionsPage.js";
 
 const urls: string[] = [];
-const COUNTS = { spells: 0, monsters: 0, classes: 0, conditions: 0, species: 0, backgrounds: 0, feats: 0, weapons: 0, armor: 0, magic_items: 2, roll_tables: 1 };
+const COUNTS = { spells: 0, monsters: 0, classes: 0, conditions: 0, species: 0, backgrounds: 0, feats: 0, weapons: 0, armor: 0, magic_items: 2, roll_tables: 1, rule_sections: 1 };
 
 const ring = { id: "srd_test-ring", documentKey: "srd-2014", name: "Test Ring", type: "ring", rarity: "rare", requiresAttunement: true };
 const potion = { id: "srd_test-potion", documentKey: "srd-2014", name: "Test Potion", type: "potion", rarity: "common", requiresAttunement: false };
@@ -18,6 +19,10 @@ const potion = { id: "srd_test-potion", documentKey: "srd-2014", name: "Test Pot
 function body(url: string): unknown {
   if (url.startsWith("/api/rules/documents")) return { items: [{ ...SRD_DOCUMENT, counts: COUNTS }] };
   const page = (items: unknown[]) => ({ items, page: 1, pageSize: 30, total: items.length, totalPages: 1 });
+  if (url.startsWith("/api/rules/rule-sections/srd_test-pit"))
+    return { data: { id: "srd_test-pit", documentKey: "srd-2014", dmOnly: false, name: "Test Pit", category: "trap", relatedIds: [], body: "A **deep** pit." }, document: SRD_DOCUMENT };
+  if (url.startsWith("/api/rules/rule-sections"))
+    return page([{ id: "srd_test-pit", documentKey: "srd-2014", name: "Test Pit", category: "trap" }]);
   if (url.startsWith("/api/rules/roll-tables/srd_test-loot"))
     return {
       data: {
@@ -120,5 +125,23 @@ describe("roll tables", () => {
   it("labels single and ranged rolls", () => {
     expect(rollLabel(3, 3)).toBe("3");
     expect(rollLabel(4, 6)).toBe("4\u20136");
+  });
+});
+
+describe("rules sections", () => {
+  it("lists with category and filters through the URL", async () => {
+    const loc = renderAt("/rules", <RuleSectionsPage />);
+    await screen.findByText("Test Pit");
+    expect(document.querySelector(".row-sub")?.textContent).toBe("Trap");
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "lore" } });
+    expect(loc.history.at(-1)).toBe("/rules?category=lore");
+    expect(ruleSectionApiParams(new URLSearchParams("category=trap&evil=1"))).not.toHaveProperty("evil");
+  });
+
+  it("shows the markdown body and the source line", async () => {
+    renderAt("/rules/srd_test-pit", <RuleSectionDetailPage id="srd_test-pit" />);
+    await screen.findByText("deep");
+    expect(screen.getByText("deep").tagName).toBe("STRONG");
+    expect(screen.getByText(/Source:/)).toBeTruthy();
   });
 });

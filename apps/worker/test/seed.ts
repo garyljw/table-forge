@@ -1,5 +1,5 @@
 import { buildImportStatements, foldName, type ImportBundle } from "@table-forge/core";
-import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, RollTable, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, RollTable, RuleSection, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 
 export const srd: SourceDocument = {
@@ -235,6 +235,10 @@ export function rollTable(id: string, name: string, over: Partial<RollTable> = {
   };
 }
 
+export function ruleSection(id: string, name: string, over: Partial<RuleSection> = {}): RuleSection {
+  return { id, documentKey: "srd-2014", dmOnly: false, name, category: "variant-rule", relatedIds: [], body: `${name} body`, ...over };
+}
+
 export const SEED = {
   documents: [srd, tob, secret],
   spells: [
@@ -305,6 +309,12 @@ export const SEED = {
     rollTable("tob_test-encounters", "Test Encounters", { documentKey: "tob", category: "encounter" }),
     rollTable("secret_hidden-table", "Hidden Table", { documentKey: "secret-book", category: "madness" }),
   ],
+  ruleSections: [
+    ruleSection("srd_test-flanking", "Test Flanking", { relatedIds: ["srd_wizard"], body: "Flank **well**." }),
+    ruleSection("srd_test-pit", "Test Pit", { category: "trap" }),
+    ruleSection("tob_test-fever", "Test Fever", { documentKey: "tob", category: "disease" }),
+    ruleSection("secret_hidden-section", "Hidden Section", { documentKey: "secret-book", category: "lore" }),
+  ],
 };
 
 export const LICENSES: LicenseText[] = [
@@ -338,7 +348,7 @@ export async function runStatements(statements: string[]): Promise<void> {
 
 /** Removes everything, then loads the Open5e seed (via the real import SQL) and a private document's rows. */
 export async function seedRules(): Promise<void> {
-  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
+  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
   const j = (v: unknown) => JSON.stringify(v);
   const priv = [
     env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
@@ -406,6 +416,9 @@ export async function seedRules(): Promise<void> {
     ...SEED.rollTables
       .filter((x) => x.documentKey === "secret-book")
       .map((x) => rollTableInsert(x, null)),
+    ...SEED.ruleSections
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) => ruleSectionInsert(x, null)),
   ];
   await env.DB.batch([...clear.map((s) => env.DB.prepare(s)), ...priv]);
   // Open5e rows go in afterwards: the document guard needs the documents to exist, and the
@@ -414,6 +427,13 @@ export async function seedRules(): Promise<void> {
   // Open5e supplies no roll tables, so these are written directly. The public ones carry run-1's marker
   // so the import's stale-row deletes (which would otherwise remove any row in an Open5e document) keep them.
   await env.DB.batch(SEED.rollTables.filter((x) => x.documentKey !== "secret-book").map((x) => rollTableInsert(x, "run-1")));
+  await env.DB.batch(SEED.ruleSections.filter((x) => x.documentKey !== "secret-book").map((x) => ruleSectionInsert(x, "run-1")));
+}
+
+function ruleSectionInsert(x: RuleSection, run: string | null) {
+  return env.DB.prepare("INSERT INTO rule_sections (id, document_key, name, name_search, category, data, import_run) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(
+    x.id, x.documentKey, x.name, foldName(x.name), x.category, JSON.stringify(x), run,
+  );
 }
 
 function rollTableInsert(x: RollTable, run: string | null) {

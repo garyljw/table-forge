@@ -244,6 +244,7 @@ async function main(): Promise<void> {
     magic_items: newStats(),
     // Open5e has no roll tables: these stay empty and exist so the guard sees every table.
     roll_tables: newStats(),
+    rule_sections: newStats(),
   };
   console.log("");
 
