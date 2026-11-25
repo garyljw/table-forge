@@ -1,5 +1,5 @@
 import { buildImportStatements, foldName, type ImportBundle } from "@table-forge/core";
-import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, RollTable, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 
 export const srd: SourceDocument = {
@@ -216,6 +216,25 @@ export function magicItem(id: string, name: string, over: Partial<MagicItem> = {
   };
 }
 
+export function rollTable(id: string, name: string, over: Partial<RollTable> = {}): RollTable {
+  return {
+    id,
+    documentKey: "srd-2014",
+    dmOnly: false,
+    name,
+    category: "trinket",
+    dice: "d4",
+    description: null,
+    columns: ["Trinket"],
+    rows: [
+      { min: 1, max: 1, cells: ["A bent spoon"] },
+      { min: 2, max: 3, cells: ["A cracked marble"] },
+      { min: 4, max: 4, cells: ["A feather"] },
+    ],
+    ...over,
+  };
+}
+
 export const SEED = {
   documents: [srd, tob, secret],
   spells: [
@@ -280,6 +299,12 @@ export const SEED = {
     magicItem("tob_test-charm", "Test Charm", { documentKey: "tob", rarity: "very-rare", cursed: true }),
     magicItem("secret_hidden-idol", "Hidden Idol", { documentKey: "secret-book", rarity: "legendary" }),
   ],
+  rollTables: [
+    rollTable("srd_test-trinkets", "Test Trinkets"),
+    rollTable("srd_test-loot", "Test Loot", { category: "treasure", dice: "d6", description: "Roll for loot.", columns: ["Item", "Value"], rows: [{ min: 1, max: 6, cells: ["A coin", "1 gp"] }] }),
+    rollTable("tob_test-encounters", "Test Encounters", { documentKey: "tob", category: "encounter" }),
+    rollTable("secret_hidden-table", "Hidden Table", { documentKey: "secret-book", category: "madness" }),
+  ],
 };
 
 export const LICENSES: LicenseText[] = [
@@ -313,7 +338,7 @@ export async function runStatements(statements: string[]): Promise<void> {
 
 /** Removes everything, then loads the Open5e seed (via the real import SQL) and a private document's rows. */
 export async function seedRules(): Promise<void> {
-  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
+  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
   const j = (v: unknown) => JSON.stringify(v);
   const priv = [
     env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
@@ -378,9 +403,21 @@ export async function seedRules(): Promise<void> {
           x.id, x.documentKey, x.name, foldName(x.name), x.type, x.rarity, x.requiresAttunement ? 1 : 0, j(x),
         ),
       ),
+    ...SEED.rollTables
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) => rollTableInsert(x, null)),
   ];
   await env.DB.batch([...clear.map((s) => env.DB.prepare(s)), ...priv]);
   // Open5e rows go in afterwards: the document guard needs the documents to exist, and the
   // private document is not an Open5e one, so its rows are untouched by the import.
   await runStatements(openBundle("run-1"));
+  // Open5e supplies no roll tables, so these are written directly. The public ones carry run-1's marker
+  // so the import's stale-row deletes (which would otherwise remove any row in an Open5e document) keep them.
+  await env.DB.batch(SEED.rollTables.filter((x) => x.documentKey !== "secret-book").map((x) => rollTableInsert(x, "run-1")));
+}
+
+function rollTableInsert(x: RollTable, run: string | null) {
+  return env.DB.prepare("INSERT INTO roll_tables (id, document_key, name, name_search, category, dice, data, import_run) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(
+    x.id, x.documentKey, x.name, foldName(x.name), x.category, x.dice, JSON.stringify(x), run,
+  );
 }

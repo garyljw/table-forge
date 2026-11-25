@@ -34,6 +34,7 @@ const TABLES = [
   { path: "weapons", name: "Hidden Blade", id: "secret_hidden-blade" },
   { path: "armor", name: "Hidden Plate", id: "secret_hidden-plate" },
   { path: "magic-items", name: "Hidden Idol", id: "secret_hidden-idol" },
+  { path: "roll-tables", name: "Hidden Table", id: "secret_hidden-table" },
 ];
 
 describe("a verified Access user", () => {

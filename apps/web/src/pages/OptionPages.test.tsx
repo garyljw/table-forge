@@ -9,7 +9,7 @@ import { EquipmentPage, armorApiParams, equipmentTab, weaponApiParams } from "./
 import { RacesPage, raceApiParams, raceKind } from "./RacesPage.js";
 
 const urls: string[] = [];
-const COUNTS = { spells: 0, monsters: 0, classes: 0, conditions: 0, species: 3, backgrounds: 0, feats: 0, weapons: 1, armor: 1, magic_items: 0 };
+const COUNTS = { spells: 0, monsters: 0, classes: 0, conditions: 0, species: 3, backgrounds: 0, feats: 0, weapons: 1, armor: 1, magic_items: 0, roll_tables: 0 };
 
 const elf = { id: "srd_elf", documentKey: "srd-2014", name: "Elf", parentSpecies: null };
 const highElf = { id: "srd_high-elf", documentKey: "srd-2014", name: "High Elf", parentSpecies: { id: "srd_elf", name: "Elf" } };

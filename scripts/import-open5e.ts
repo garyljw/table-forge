@@ -76,7 +76,7 @@ import {
   type RawSpell,
   type RawWeapon,
 } from "@table-forge/core";
-import { RULE_TABLES, Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import { RULE_TABLES, type RuleTable, Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workerDir = path.join(root, "apps/worker");
@@ -242,6 +242,8 @@ async function main(): Promise<void> {
     weapons: newStats(),
     armor: newStats(),
     magic_items: newStats(),
+    // Open5e has no roll tables: these stay empty and exist so the guard sees every table.
+    roll_tables: newStats(),
   };
   console.log("");
 
@@ -380,18 +382,7 @@ async function main(): Promise<void> {
     for (const t of RULE_TABLES) if (typeof existing[t] !== "number") throw new Error(`could not read the existing ${t} count from D1`);
   }
   const problems = checkImport(
-    {
-      spells: summary(stats.spells),
-      monsters: summary(stats.monsters),
-      classes: summary(stats.classes),
-      conditions: summary(stats.conditions),
-      species: summary(stats.species),
-      backgrounds: summary(stats.backgrounds),
-      feats: summary(stats.feats),
-      weapons: summary(stats.weapons),
-      armor: summary(stats.armor),
-      magic_items: summary(stats.magic_items),
-    },
+    Object.fromEntries(RULE_TABLES.map((t) => [t, summary(stats[t])])) as Record<RuleTable, ReturnType<typeof summary>>,
     existing,
     { maxFailureRate: 0.05, maxDropRate: 0.2, force },
   );

@@ -16,6 +16,8 @@ import {
   MagicItemListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
+  RollTableDetailResponse,
+  RollTableListResponse,
   SpeciesDetailResponse,
   SpeciesListResponse,
   SpellDetailResponse,
@@ -431,6 +433,32 @@ describe("magic items", () => {
   });
 });
 
+describe("roll tables", () => {
+  it("lists and filters by category, source and name", async () => {
+    const list = RollTableListResponse.parse(await (await get("/roll-tables")).json());
+    expect(list.items.map((t) => [t.name, t.category, t.dice])).toEqual([
+      ["Test Encounters", "encounter", "d4"],
+      ["Test Loot", "treasure", "d6"],
+      ["Test Trinkets", "trinket", "d4"],
+    ]);
+    expect(await names("/roll-tables?category=treasure")).toEqual(["Test Loot"]);
+    expect(await names("/roll-tables?document=tob")).toEqual(["Test Encounters"]);
+    expect(await names("/roll-tables?q=trink")).toEqual(["Test Trinkets"]);
+  });
+
+  it("returns the whole table with its columns and rows", async () => {
+    const detail = RollTableDetailResponse.parse(await (await get("/roll-tables/srd_test-loot")).json());
+    expect(detail.data).toMatchObject({ dice: "d6", description: "Roll for loot.", columns: ["Item", "Value"], rows: [{ min: 1, max: 6, cells: ["A coin", "1 gp"] }] });
+    expect(detail.document.key).toBe("srd-2014");
+  });
+
+  it("never serves a private document's table", async () => {
+    expect(JSON.stringify(await (await get("/roll-tables")).json())).not.toContain("Hidden");
+    expect((await get("/roll-tables/secret_hidden-table")).status).toBe(404);
+    expect((await get("/roll-tables/srd_nope")).status).toBe(404);
+  });
+});
+
 describe("dmOnly is data only", () => {
   it("does not hide or change anything yet: flagged records are still served to everyone", async () => {
     await env.DB.batch([
@@ -455,7 +483,7 @@ describe("documents", () => {
     const body = DocumentListResponse.parse(await (await get("/documents")).json());
     expect(body.items.map((d) => d.key)).toEqual(["srd-2014", "tob"]);
     const srd = body.items[0];
-    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3, magic_items: 3 });
+    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3, magic_items: 3, roll_tables: 2 });
     expect(srd?.attribution).toBe("SRD ATTRIBUTION TEXT");
     expect(body.items[1]?.copyrightNotice).toBe("Tome of Beasts Copyright 2016, Kobold Press.");
     expect(JSON.stringify(body)).not.toContain("secret-book");
@@ -549,6 +577,8 @@ describe("bad parameters give 400", () => {
     "/magic-items?rarity=mythic",
     "/magic-items?attunement=yes",
     "/magic-items?page=0",
+    "/roll-tables?category=bogus",
+    "/roll-tables?q=",
     "/feats?q=",
     "/backgrounds?page=0",
   ])("%s", async (path) => {

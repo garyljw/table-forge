@@ -4,11 +4,13 @@ import { memoryLocation } from "wouter/memory-location";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { magicItemSubtitle } from "../format.js";
 import { SRD_DOCUMENT } from "../test-fixtures.js";
-import { MagicItemDetailPage } from "./DetailPages.js";
+import { rollLabel } from "../components/RollTableView.js";
+import { MagicItemDetailPage, RollTableDetailPage } from "./DetailPages.js";
 import { MagicItemsPage, magicItemApiParams } from "./MagicItemsPage.js";
+import { RollTablesPage, rollTableApiParams } from "./RollTablesPage.js";
 
 const urls: string[] = [];
-const COUNTS = { spells: 0, monsters: 0, classes: 0, conditions: 0, species: 0, backgrounds: 0, feats: 0, weapons: 0, armor: 0, magic_items: 2 };
+const COUNTS = { spells: 0, monsters: 0, classes: 0, conditions: 0, species: 0, backgrounds: 0, feats: 0, weapons: 0, armor: 0, magic_items: 2, roll_tables: 1 };
 
 const ring = { id: "srd_test-ring", documentKey: "srd-2014", name: "Test Ring", type: "ring", rarity: "rare", requiresAttunement: true };
 const potion = { id: "srd_test-potion", documentKey: "srd-2014", name: "Test Potion", type: "potion", rarity: "common", requiresAttunement: false };
@@ -16,6 +18,16 @@ const potion = { id: "srd_test-potion", documentKey: "srd-2014", name: "Test Pot
 function body(url: string): unknown {
   if (url.startsWith("/api/rules/documents")) return { items: [{ ...SRD_DOCUMENT, counts: COUNTS }] };
   const page = (items: unknown[]) => ({ items, page: 1, pageSize: 30, total: items.length, totalPages: 1 });
+  if (url.startsWith("/api/rules/roll-tables/srd_test-loot"))
+    return {
+      data: {
+        id: "srd_test-loot", documentKey: "srd-2014", dmOnly: false, name: "Test Loot", category: "treasure", dice: "d6", description: "Roll for **loot**.",
+        columns: ["Item", "Value"],
+        rows: [{ min: 1, max: 1, cells: ["A coin", "1 gp"] }, { min: 2, max: 6, cells: ["A gem", "50 gp"] }],
+      },
+      document: SRD_DOCUMENT,
+    };
+  if (url.startsWith("/api/rules/roll-tables")) return page([{ id: "srd_test-loot", documentKey: "srd-2014", name: "Test Loot", category: "treasure", dice: "d6" }]);
   if (url.startsWith("/api/rules/magic-items/srd_test-ring"))
     return {
       data: { ...ring, baseItem: null, attunementDetail: "by a wizard", description: "A **plain** ring.", sentient: false, cursed: true },
@@ -80,5 +92,33 @@ describe("magic item detail", () => {
   it("builds the subtitle", () => {
     expect(magicItemSubtitle({ type: "wondrous-item", rarity: "very-rare", baseItem: null, requiresAttunement: false, attunementDetail: null })).toBe("Wondrous item, very rare");
     expect(magicItemSubtitle({ type: "weapon", rarity: "uncommon", baseItem: "longsword", requiresAttunement: true, attunementDetail: null })).toBe("Weapon (longsword), uncommon (requires attunement)");
+  });
+});
+
+describe("roll tables", () => {
+  it("lists with category and dice, and filters through the URL", async () => {
+    const loc = renderAt("/roll-tables", <RollTablesPage />);
+    await screen.findByText("Test Loot");
+    expect(screen.getByText("Treasure · d6")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "madness" } });
+    expect(loc.history.at(-1)).toBe("/roll-tables?category=madness");
+    expect(rollTableApiParams(new URLSearchParams("category=npc&evil=1"))).not.toHaveProperty("evil");
+  });
+
+  it("renders the table with the die as the first heading and ranges for multi-roll rows", async () => {
+    renderAt("/roll-tables/srd_test-loot", <RollTableDetailPage id="srd_test-loot" />);
+    await screen.findByRole("table");
+    const headings = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headings).toEqual(["d6", "Item", "Value"]);
+    const rows = screen.getAllByRole("row").map((r) => r.textContent);
+    expect(rows[1]).toBe("1A coin1 gp");
+    expect(rows[2]).toBe("2\u20136A gem50 gp");
+    expect(screen.getByText("loot").tagName).toBe("STRONG");
+    expect(screen.getByText(/Source:/)).toBeTruthy();
+  });
+
+  it("labels single and ranged rolls", () => {
+    expect(rollLabel(3, 3)).toBe("3");
+    expect(rollLabel(4, 6)).toBe("4\u20136");
   });
 });

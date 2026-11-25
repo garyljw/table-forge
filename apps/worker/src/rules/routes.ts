@@ -26,6 +26,9 @@ import {
   MonsterListQuery,
   MonsterListResponse,
   RecordId,
+  RollTableDetailResponse,
+  RollTableListQuery,
+  RollTableListResponse,
   SourceDocument,
   SpeciesDetailResponse,
   SpeciesListQuery,
@@ -457,6 +460,31 @@ rulesRoutes.get("/magic-items/:id", async (c) => {
   return c.json(MagicItemDetailResponse.parse(found));
 });
 
+interface RollTableRow extends NamedRow {
+  category: string;
+  dice: string;
+}
+
+rulesRoutes.get("/roll-tables", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, RollTableListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  if (q.category !== undefined) where.add("t.category = ?", q.category);
+  const { rows, total } = await selectPage<RollTableRow>(c.env.DB, "roll_tables", "t.id, t.document_key, t.name, t.category, t.dice", where, q.page, q.pageSize);
+  const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, category: r.category, dice: r.dice }));
+  return c.json(RollTableListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/roll-tables/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "roll_tables", id.data) : null;
+  if (!found) return notFound(c, "Roll table");
+  return c.json(RollTableDetailResponse.parse(found));
+});
+
 /** Every document visible to the caller, with how many records of each type it supplies. For the credits page. */
 rulesRoutes.get("/documents", async (c) => {
   const { docs, counts } = await selectDocuments(c.env.DB, documentScopeFor(c.get("identity")));
@@ -478,6 +506,7 @@ rulesRoutes.get("/documents", async (c) => {
         weapons: countFor(7, document.key),
         armor: countFor(8, document.key),
         magic_items: countFor(9, document.key),
+        roll_tables: countFor(10, document.key),
       },
     };
   });

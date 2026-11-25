@@ -15,6 +15,8 @@ import {
   MagicItemListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
+  RollTableDetailResponse,
+  RollTableListResponse,
   SpeciesDetailResponse,
   SpeciesListResponse,
   SpellDetailResponse,
@@ -24,7 +26,7 @@ import {
 } from "@table-forge/shared";
 import { apiGet, type QueryParams } from "./client.js";
 
-export type RuleKind = "spells" | "monsters" | "classes" | "conditions" | "species" | "backgrounds" | "feats" | "weapons" | "armor" | "magic_items";
+export type RuleKind = "spells" | "monsters" | "classes" | "conditions" | "species" | "backgrounds" | "feats" | "weapons" | "armor" | "magic_items" | "roll_tables";
 
 export const listSpells = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/spells", SpellListResponse, p, s);
 export const getSpell = (id: string, s?: AbortSignal) =>
@@ -60,6 +62,9 @@ export const getArmor = (id: string, s?: AbortSignal) =>
 export const listMagicItems = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/magic-items", MagicItemListResponse, p, s);
 export const getMagicItem = (id: string, s?: AbortSignal) =>
   apiGet(`/api/rules/magic-items/${encodeURIComponent(id)}`, MagicItemDetailResponse, {}, s);
+export const listRollTables = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/roll-tables", RollTableListResponse, p, s);
+export const getRollTable = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/roll-tables/${encodeURIComponent(id)}`, RollTableDetailResponse, {}, s);
 
 // Documents and licences depend on who is signed in (private books are listed for Access users only),
 // so they are fetched fresh on every use and never held in a module-level cache that could outlive a
