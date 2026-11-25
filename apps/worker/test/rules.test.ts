@@ -1,15 +1,25 @@
 import {
   ApiError,
+  ArmorDetailResponse,
+  ArmorListResponse,
+  BackgroundDetailResponse,
+  BackgroundListResponse,
   ClassDetailResponse,
   ClassListResponse,
   ConditionDetailResponse,
   ConditionListResponse,
   DocumentListResponse,
+  FeatDetailResponse,
+  FeatListResponse,
   LicenseListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
+  SpeciesDetailResponse,
+  SpeciesListResponse,
   SpellDetailResponse,
   SpellListResponse,
+  WeaponDetailResponse,
+  WeaponListResponse,
 } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -232,12 +242,161 @@ describe("conditions", () => {
   });
 });
 
+describe("species", () => {
+  it("lists species and subspecies, and filters between them", async () => {
+    const all = SpeciesListResponse.parse(await (await get("/species")).json());
+    expect(all.items.map((s) => s.name)).toEqual(["Dwarf", "Elf", "High Elf", "Wood Elf"]);
+    expect(all.items.find((s) => s.id === "srd_high-elf")?.parentSpecies).toEqual({ id: "srd_elf", name: "Elf" });
+    expect(all.items.find((s) => s.id === "srd_elf")?.parentSpecies).toBeNull();
+    expect(await names("/species?kind=species")).toEqual(["Dwarf", "Elf"]);
+    expect(await names("/species?kind=subspecies")).toEqual(["High Elf", "Wood Elf"]);
+    expect(await names("/species?parent=srd_elf")).toEqual(["High Elf", "Wood Elf"]);
+    expect(await names("/species?q=ELF")).toEqual(["Elf", "High Elf", "Wood Elf"]);
+    expect(await names("/species?document=tob")).toEqual(["Wood Elf"]);
+  });
+
+  it("returns a species with its traits, its public subspecies and attribution", async () => {
+    const body = SpeciesDetailResponse.parse(await (await get("/species/srd_elf")).json());
+    expect(body.data.traits[0]?.name).toBe("Darkvision");
+    expect(body.subspecies.map((s) => s.name)).toEqual(["High Elf", "Wood Elf"]);
+    expect(body.document.attribution).toBe("SRD ATTRIBUTION TEXT");
+    const sub = SpeciesDetailResponse.parse(await (await get("/species/tob_wood-elf")).json());
+    expect(sub.data.parentSpecies).toEqual({ id: "srd_elf", name: "Elf" });
+    expect(sub.subspecies).toEqual([]);
+    expect(sub.document.attribution).toBe("TOB ATTRIBUTION TEXT");
+  });
+
+  it("never serves a private document's species, in lists, filters, subspecies or details", async () => {
+    const everything = JSON.stringify([await (await get("/species")).json(), await (await get("/species/srd_elf")).json(), await (await get("/species?document=secret-book")).json()]);
+    expect(everything).not.toContain("Hidden");
+    expect(everything).not.toContain("secret_");
+    expect((await get("/species/secret_hidden-species")).status).toBe(404);
+    expect((await get("/species/secret_hidden-elf")).status).toBe(404);
+  });
+
+  it("lists subspecies in a fixed query, and an unknown table is refused", async () => {
+    const { selectChildren } = await import("../src/rules/db.js");
+    const rows = await selectChildren<{ name: string }>(env.DB, "species", "t.name", "srd_elf");
+    expect(rows.map((r) => r.name)).toEqual(["High Elf", "Wood Elf"]);
+    await expect(selectChildren(env.DB, "spells; DROP TABLE species" as never, "t.name", "x")).rejects.toThrow(/no children query/);
+    expect(await names("/species")).toContain("Elf");
+  });
+
+  it("404s for unknown and malformed ids", async () => {
+    const res = await get("/species/nope");
+    expect(res.status).toBe(404);
+    expect(ApiError.parse(await res.json()).error).toBe("Species not found");
+    expect((await get("/species/%27%3B%20drop")).status).toBe(404);
+  });
+});
+
+describe("backgrounds", () => {
+  it("lists, searches and returns details with attribution", async () => {
+    const list = BackgroundListResponse.parse(await (await get("/backgrounds")).json());
+    expect(list.items.map((b) => b.name)).toEqual(["Acolyte", "Caravan Guard"]);
+    expect(await names("/backgrounds?q=guard")).toEqual(["Caravan Guard"]);
+    expect(await names("/backgrounds?document=tob")).toEqual(["Caravan Guard"]);
+    const detail = BackgroundDetailResponse.parse(await (await get("/backgrounds/srd_acolyte")).json());
+    expect(detail.data.benefits[0]).toEqual({ name: "Skill Proficiencies", description: "Insight, Religion", type: "skill_proficiency" });
+    expect(detail.document.key).toBe("srd-2014");
+  });
+
+  it("never serves a private document's background", async () => {
+    expect(JSON.stringify(await (await get("/backgrounds")).json())).not.toContain("Hidden");
+    expect(await names("/backgrounds?document=secret-book")).toEqual([]);
+    expect((await get("/backgrounds/secret_hidden-background")).status).toBe(404);
+    expect((await get("/backgrounds/srd_nope")).status).toBe(404);
+  });
+});
+
+describe("feats", () => {
+  it("lists with prerequisites and returns details", async () => {
+    const list = FeatListResponse.parse(await (await get("/feats")).json());
+    expect(list.items.map((f) => [f.name, f.prerequisite])).toEqual([["Grappler", "Strength 13 or higher"], ["Lucky Streak", null]]);
+    expect(await names("/feats?q=grap")).toEqual(["Grappler"]);
+    const detail = FeatDetailResponse.parse(await (await get("/feats/srd_grappler")).json());
+    expect(detail.data.benefits).toEqual(["A benefit."]);
+    expect(detail.document.attribution).toBe("SRD ATTRIBUTION TEXT");
+  });
+
+  it("never serves a private document's feat", async () => {
+    expect(JSON.stringify(await (await get("/feats")).json())).not.toContain("Hidden");
+    expect((await get("/feats/secret_hidden-feat")).status).toBe(404);
+    expect((await get("/feats/srd_nope")).status).toBe(404);
+  });
+});
+
+describe("weapons", () => {
+  it("lists with summary fields and filters by category, kind and damage type", async () => {
+    const all = WeaponListResponse.parse(await (await get("/weapons")).json());
+    expect(all.items.map((w) => w.name)).toEqual(["Dagger", "Longsword", "Net", "Shortbow"]);
+    expect(all.items.find((w) => w.id === "srd_longsword")).toEqual({
+      id: "srd_longsword",
+      documentKey: "srd-2014",
+      name: "Longsword",
+      category: "martial",
+      kind: "melee",
+      damageDice: "1d8",
+      damageType: "slashing",
+    });
+    expect(await names("/weapons?category=simple")).toEqual(["Dagger", "Shortbow"]);
+    expect(await names("/weapons?category=martial")).toEqual(["Longsword", "Net"]);
+    expect(await names("/weapons?kind=ranged")).toEqual(["Net", "Shortbow"]);
+    expect(await names("/weapons?damageType=piercing")).toEqual(["Dagger", "Shortbow"]);
+    expect(await names("/weapons?category=simple&damageType=slashing")).toEqual([]);
+    expect(await names("/weapons?q=sword")).toEqual(["Longsword"]);
+  });
+
+  it("serves a weapon with no damage type, and it is not matched by a damage type filter", async () => {
+    const detail = WeaponDetailResponse.parse(await (await get("/weapons/srd_net")).json());
+    expect(detail.data).toMatchObject({ damageDice: "0", damageType: null });
+    expect(await names("/weapons?damageType=bludgeoning")).toEqual([]);
+  });
+
+  it("returns properties and range, and never serves a private document's weapon", async () => {
+    const detail = WeaponDetailResponse.parse(await (await get("/weapons/srd_dagger")).json());
+    expect(detail.data.range).toEqual({ normalFeet: 20, longFeet: 60 });
+    expect(detail.data.properties[0]?.name).toBe("Versatile");
+    expect(JSON.stringify(await (await get("/weapons")).json())).not.toContain("Hidden");
+    expect((await get("/weapons/secret_hidden-blade")).status).toBe(404);
+    expect((await get("/weapons/srd_nope")).status).toBe(404);
+  });
+});
+
+describe("armor", () => {
+  it("lists full records and filters by category", async () => {
+    const all = ArmorListResponse.parse(await (await get("/armor")).json());
+    expect(all.items.map((a) => a.name)).toEqual(["Breastplate", "Chain Mail", "Leather"]);
+    expect(all.items.find((a) => a.id === "srd_chain-mail")).toMatchObject({ category: "heavy", acBase: 16, strengthRequired: 13, stealthDisadvantage: true, dexModifierCap: null });
+    expect(await names("/armor?category=heavy")).toEqual(["Chain Mail"]);
+    expect(await names("/armor?category=light")).toEqual(["Leather"]);
+    expect(await names("/armor?q=plate")).toEqual(["Breastplate"]);
+  });
+
+  it("leaves a malformed row out of the list instead of failing it", async () => {
+    await env.DB.prepare("UPDATE armor SET category = 'robe' WHERE id = 'srd_leather'").run();
+    const res = await get("/armor");
+    expect(res.status).toBe(200);
+    expect(ArmorListResponse.parse(await res.json()).items.map((a) => a.name)).toEqual(["Breastplate", "Chain Mail"]);
+  });
+
+  it("returns a detail with attribution, and never serves a private document's armour", async () => {
+    const detail = ArmorDetailResponse.parse(await (await get("/armor/srd_breastplate")).json());
+    expect(detail.data.dexModifierCap).toBe(2);
+    expect(detail.document.attribution).toBe("SRD ATTRIBUTION TEXT");
+    expect(JSON.stringify(await (await get("/armor")).json())).not.toContain("Hidden");
+    expect(await names("/armor?document=secret-book")).toEqual([]);
+    expect((await get("/armor/secret_hidden-plate")).status).toBe(404);
+    expect((await get("/armor/srd_nope")).status).toBe(404);
+  });
+});
+
 describe("documents", () => {
   it("lists public documents with counts, for the credits page", async () => {
     const body = DocumentListResponse.parse(await (await get("/documents")).json());
     expect(body.items.map((d) => d.key)).toEqual(["srd-2014", "tob"]);
     const srd = body.items[0];
-    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2 });
+    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3 });
     expect(srd?.attribution).toBe("SRD ATTRIBUTION TEXT");
     expect(body.items[1]?.copyrightNotice).toBe("Tome of Beasts Copyright 2016, Kobold Press.");
     expect(JSON.stringify(body)).not.toContain("secret-book");
@@ -321,6 +480,14 @@ describe("bad parameters give 400", () => {
     "/monsters?crMin=abc",
     "/monsters?crMax=31",
     "/classes?kind=other",
+    "/species?kind=other",
+    "/species?parent=Not%20A%20Slug",
+    "/weapons?category=exotic",
+    "/weapons?kind=thrown",
+    "/weapons?damageType=a%20b",
+    "/armor?category=robe",
+    "/feats?q=",
+    "/backgrounds?page=0",
   ])("%s", async (path) => {
     const res = await get(path);
     expect(res.status).toBe(400);

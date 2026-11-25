@@ -149,3 +149,67 @@ export interface RawLicense {
   name: string;
   desc: string;
 }
+
+export interface RawSpeciesTrait {
+  name: string;
+  desc?: string | null;
+  type?: string | null;
+}
+
+export interface RawSpecies {
+  key: string;
+  name: string;
+  document: RawDocumentRef;
+  desc?: string | null;
+  is_subspecies?: boolean;
+  /** The parent species' key (e.g. `srd_elf`), or null for a base species. */
+  subspecies_of?: string | null;
+  traits?: RawSpeciesTrait[];
+}
+
+export interface RawBackground {
+  key: string;
+  name: string;
+  document: RawDocumentRef;
+  desc?: string | null;
+  benefits?: { name: string; desc?: string | null; type?: string | null }[];
+}
+
+export interface RawFeat {
+  key: string;
+  name: string;
+  document: RawDocumentRef;
+  desc?: string | null;
+  prerequisite?: string | null;
+  has_prerequisite?: boolean;
+  type?: string | null;
+  benefits?: { desc?: string | null }[];
+}
+
+export interface RawWeapon {
+  key: string;
+  name: string;
+  document: RawDocumentRef;
+  damage_dice?: string | null;
+  damage_type?: { key: string; name?: string } | null;
+  properties?: { property: { name: string; type?: string | null; desc?: string | null }; detail?: string | null }[];
+  /** Feet. 0 when the weapon has no range. */
+  range?: number | null;
+  long_range?: number | null;
+  distance_unit?: string | null;
+  is_simple?: boolean;
+  is_improvised?: boolean;
+}
+
+export interface RawArmor {
+  key: string;
+  name: string;
+  document: RawDocumentRef;
+  ac_display?: string | null;
+  category: string;
+  grants_stealth_disadvantage?: boolean;
+  strength_score_required?: number | null;
+  ac_base: number;
+  ac_add_dexmod?: boolean;
+  ac_cap_dexmod?: number | null;
+}

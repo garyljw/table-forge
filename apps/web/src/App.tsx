@@ -1,18 +1,35 @@
 import { useEffect } from "react";
 import { Link, Route, Switch, useLocation, useSearch } from "wouter";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
+import { BackgroundsPage } from "./pages/BackgroundsPage.js";
 import { ClassesPage } from "./pages/ClassesPage.js";
 import { ConditionsPage } from "./pages/ConditionsPage.js";
 import { CreditsPage } from "./pages/CreditsPage.js";
-import { ClassDetailPage, MonsterDetailPage, SpellDetailPage } from "./pages/DetailPages.js";
+import { EquipmentPage } from "./pages/EquipmentPage.js";
+import { FeatsPage } from "./pages/FeatsPage.js";
+import {
+  ArmorDetailPage,
+  BackgroundDetailPage,
+  ClassDetailPage,
+  FeatDetailPage,
+  MonsterDetailPage,
+  SpeciesDetailPage,
+  SpellDetailPage,
+  WeaponDetailPage,
+} from "./pages/DetailPages.js";
 import { HomePage } from "./pages/HomePage.js";
 import { MonstersPage } from "./pages/MonstersPage.js";
+import { RacesPage } from "./pages/RacesPage.js";
 import { SpellsPage } from "./pages/SpellsPage.js";
 
 const NAV = [
   { href: "/spells", label: "Spells" },
   { href: "/monsters", label: "Monsters" },
   { href: "/classes", label: "Classes" },
+  { href: "/races", label: "Races" },
+  { href: "/backgrounds", label: "Backgrounds" },
+  { href: "/feats", label: "Feats" },
+  { href: "/equipment", label: "Equipment" },
   { href: "/conditions", label: "Conditions" },
   { href: "/credits", label: "Credits" },
 ];
@@ -94,6 +111,15 @@ export function App() {
             <Route path="/monsters/:id">{(p: { id: string }) => <MonsterDetailPage id={p.id} />}</Route>
             <Route path="/classes" component={ClassesPage} />
             <Route path="/classes/:id">{(p: { id: string }) => <ClassDetailPage id={p.id} />}</Route>
+            <Route path="/races" component={RacesPage} />
+            <Route path="/races/:id">{(p: { id: string }) => <SpeciesDetailPage id={p.id} />}</Route>
+            <Route path="/backgrounds" component={BackgroundsPage} />
+            <Route path="/backgrounds/:id">{(p: { id: string }) => <BackgroundDetailPage id={p.id} />}</Route>
+            <Route path="/feats" component={FeatsPage} />
+            <Route path="/feats/:id">{(p: { id: string }) => <FeatDetailPage id={p.id} />}</Route>
+            <Route path="/equipment" component={EquipmentPage} />
+            <Route path="/equipment/weapons/:id">{(p: { id: string }) => <WeaponDetailPage id={p.id} />}</Route>
+            <Route path="/equipment/armor/:id">{(p: { id: string }) => <ArmorDetailPage id={p.id} />}</Route>
             <Route path="/conditions" component={ConditionsPage} />
             <Route path="/credits" component={CreditsPage} />
             <Route component={NotFound} />

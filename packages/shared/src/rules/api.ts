@@ -1,10 +1,15 @@
 import { z } from "zod";
+import { Armor, ArmorCategory } from "./armor.js";
+import { Background, BackgroundSummary } from "./background.js";
 import { ClassDetail, ClassSummary } from "./class.js";
 import { DocumentKey } from "./common.js";
 import { Condition, ConditionSummary } from "./condition.js";
 import { LicenseText, SourceDocument } from "./document.js";
+import { Feat, FeatSummary } from "./feat.js";
 import { Monster, MonsterSummary } from "./monster.js";
+import { Species, SpeciesSummary } from "./species.js";
 import { Spell, SpellLevel, SpellSummary } from "./spell.js";
+import { Weapon, WeaponCategory, WeaponKind, WeaponSummary } from "./weapon.js";
 
 // ---- Query parameters (every value arrives as a string) ----
 
@@ -73,6 +78,33 @@ export type ClassListQuery = z.infer<typeof ClassListQuery>;
 export const ConditionListQuery = ListQueryBase;
 export type ConditionListQuery = z.infer<typeof ConditionListQuery>;
 
+export const SpeciesListQuery = ListQueryBase.extend({
+  /** `species` for base species only, `subspecies` for subspecies (subraces) only. */
+  kind: z.enum(["species", "subspecies"]).optional(),
+  /** Only subspecies of this species id. */
+  parent: slugParam.optional(),
+});
+export type SpeciesListQuery = z.infer<typeof SpeciesListQuery>;
+
+export const BackgroundListQuery = ListQueryBase;
+export type BackgroundListQuery = z.infer<typeof BackgroundListQuery>;
+
+export const FeatListQuery = ListQueryBase;
+export type FeatListQuery = z.infer<typeof FeatListQuery>;
+
+export const WeaponListQuery = ListQueryBase.extend({
+  category: WeaponCategory.optional(),
+  kind: WeaponKind.optional(),
+  /** Damage type slug, e.g. `slashing`. */
+  damageType: slugParam.optional(),
+});
+export type WeaponListQuery = z.infer<typeof WeaponListQuery>;
+
+export const ArmorListQuery = ListQueryBase.extend({
+  category: ArmorCategory.optional(),
+});
+export type ArmorListQuery = z.infer<typeof ArmorListQuery>;
+
 // ---- Response bodies ----
 
 export const paginated = <T extends z.ZodType>(item: T) =>
@@ -110,9 +142,51 @@ export type ConditionListResponse = z.infer<typeof ConditionListResponse>;
 export const ConditionDetailResponse = detail(Condition);
 export type ConditionDetailResponse = z.infer<typeof ConditionDetailResponse>;
 
+export const SpeciesListResponse = paginated(SpeciesSummary);
+export type SpeciesListResponse = z.infer<typeof SpeciesListResponse>;
+export const SpeciesDetailResponse = detail(Species).extend({
+  /** Subspecies of this species, when it is a base species. */
+  subspecies: z.array(SpeciesSummary),
+});
+export type SpeciesDetailResponse = z.infer<typeof SpeciesDetailResponse>;
+
+export const BackgroundListResponse = paginated(BackgroundSummary);
+export type BackgroundListResponse = z.infer<typeof BackgroundListResponse>;
+export const BackgroundDetailResponse = detail(Background);
+export type BackgroundDetailResponse = z.infer<typeof BackgroundDetailResponse>;
+
+export const FeatListResponse = paginated(FeatSummary);
+export type FeatListResponse = z.infer<typeof FeatListResponse>;
+export const FeatDetailResponse = detail(Feat);
+export type FeatDetailResponse = z.infer<typeof FeatDetailResponse>;
+
+export const WeaponListResponse = paginated(WeaponSummary);
+export type WeaponListResponse = z.infer<typeof WeaponListResponse>;
+export const WeaponDetailResponse = detail(Weapon);
+export type WeaponDetailResponse = z.infer<typeof WeaponDetailResponse>;
+
+export const ArmorListResponse = paginated(Armor);
+export type ArmorListResponse = z.infer<typeof ArmorListResponse>;
+export const ArmorDetailResponse = detail(Armor);
+export type ArmorDetailResponse = z.infer<typeof ArmorDetailResponse>;
+
 /** `GET /api/rules/documents`: every document with public records, for the credits page. */
 export const DocumentListResponse = z.object({
-  items: z.array(SourceDocument.extend({ counts: z.object({ spells: z.number().int(), monsters: z.number().int(), classes: z.number().int(), conditions: z.number().int() }) })),
+  items: z.array(
+    SourceDocument.extend({
+      counts: z.object({
+        spells: z.number().int(),
+        monsters: z.number().int(),
+        classes: z.number().int(),
+        conditions: z.number().int(),
+        species: z.number().int(),
+        backgrounds: z.number().int(),
+        feats: z.number().int(),
+        weapons: z.number().int(),
+        armor: z.number().int(),
+      }),
+    }),
+  ),
 });
 export type DocumentListResponse = z.infer<typeof DocumentListResponse>;
 

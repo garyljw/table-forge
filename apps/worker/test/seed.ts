@@ -1,5 +1,5 @@
 import { buildImportStatements, foldName, type ImportBundle } from "@table-forge/core";
-import type { ClassDetail, Condition, LicenseText, Monster, MonsterFeature, SourceDocument, Spell } from "@table-forge/shared";
+import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, Monster, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 
 export const srd: SourceDocument = {
@@ -130,6 +130,65 @@ export function condition(id: string, name: string, over: Partial<Condition> = {
   return { id, documentKey: "srd-2014", name, description: `${name} text`, ...over };
 }
 
+export function species(id: string, name: string, over: Partial<Species> = {}): Species {
+  return {
+    id,
+    documentKey: "srd-2014",
+    name,
+    parentSpecies: null,
+    description: `${name} description`,
+    traits: [{ name: "Darkvision", description: "You can see in the dark.", type: null }],
+    ...over,
+  };
+}
+
+export function background(id: string, name: string, over: Partial<Background> = {}): Background {
+  return {
+    id,
+    documentKey: "srd-2014",
+    name,
+    description: `${name} description`,
+    benefits: [{ name: "Skill Proficiencies", description: "Insight, Religion", type: "skill_proficiency" }],
+    ...over,
+  };
+}
+
+export function feat(id: string, name: string, over: Partial<Feat> = {}): Feat {
+  return { id, documentKey: "srd-2014", name, prerequisite: null, category: "GENERAL", description: `${name} description`, benefits: ["A benefit."], ...over };
+}
+
+export function weapon(id: string, name: string, over: Partial<Weapon> = {}): Weapon {
+  return {
+    id,
+    documentKey: "srd-2014",
+    name,
+    category: "martial",
+    kind: "melee",
+    damageDice: "1d8",
+    damageType: "slashing",
+    improvised: false,
+    range: null,
+    properties: [{ name: "Versatile", detail: "1d10", description: "Two hands." }],
+    ...over,
+  };
+}
+
+export function armor(id: string, name: string, over: Partial<Armor> = {}): Armor {
+  return {
+    id,
+    documentKey: "srd-2014",
+    name,
+    category: "medium",
+    acBase: 14,
+    addsDexModifier: true,
+    dexModifierCap: 2,
+    strengthRequired: null,
+    stealthDisadvantage: false,
+    acDisplay: "14 + Dex modifier (max 2)",
+    ...over,
+  };
+}
+
 export const SEED = {
   documents: [srd, tob, secret],
   spells: [
@@ -156,6 +215,37 @@ export const SEED = {
     klass("secret_hidden-subclass", "Hidden Subclass", { documentKey: "secret-book", parentClass: { id: "srd_wizard", name: "Wizard" } }),
   ],
   conditions: [condition("srd-2014_blinded", "Blinded"), condition("srd-2014_charmed", "Charmed")],
+  species: [
+    species("srd_elf", "Elf"),
+    species("srd_dwarf", "Dwarf"),
+    species("srd_high-elf", "High Elf", { parentSpecies: { id: "srd_elf", name: "Elf" } }),
+    species("tob_wood-elf", "Wood Elf", { documentKey: "tob", parentSpecies: { id: "srd_elf", name: "Elf" } }),
+    species("secret_hidden-species", "Hidden Species", { documentKey: "secret-book" }),
+    species("secret_hidden-elf", "Hidden Elf", { documentKey: "secret-book", parentSpecies: { id: "srd_elf", name: "Elf" } }),
+  ],
+  backgrounds: [
+    background("srd_acolyte", "Acolyte"),
+    background("tob_caravan-guard", "Caravan Guard", { documentKey: "tob" }),
+    background("secret_hidden-background", "Hidden Background", { documentKey: "secret-book" }),
+  ],
+  feats: [
+    feat("srd_grappler", "Grappler", { prerequisite: "Strength 13 or higher" }),
+    feat("tob_lucky-streak", "Lucky Streak", { documentKey: "tob" }),
+    feat("secret_hidden-feat", "Hidden Feat", { documentKey: "secret-book" }),
+  ],
+  weapons: [
+    weapon("srd_longsword", "Longsword"),
+    weapon("srd_dagger", "Dagger", { category: "simple", damageType: "piercing", damageDice: "1d4", range: { normalFeet: 20, longFeet: 60 } }),
+    weapon("srd_net", "Net", { damageDice: "0", damageType: null, category: "martial", kind: "ranged" }),
+    weapon("srd_shortbow", "Shortbow", { category: "simple", kind: "ranged", damageType: "piercing", damageDice: "1d6", range: { normalFeet: 80, longFeet: 320 } }),
+    weapon("secret_hidden-blade", "Hidden Blade", { documentKey: "secret-book" }),
+  ],
+  armor: [
+    armor("srd_breastplate", "Breastplate"),
+    armor("srd_chain-mail", "Chain Mail", { category: "heavy", acBase: 16, addsDexModifier: false, dexModifierCap: null, strengthRequired: 13, stealthDisadvantage: true, acDisplay: "16" }),
+    armor("srd_leather", "Leather", { category: "light", acBase: 11, dexModifierCap: null, acDisplay: "11 + Dex modifier" }),
+    armor("secret_hidden-plate", "Hidden Plate", { documentKey: "secret-book", category: "heavy" }),
+  ],
 };
 
 export const LICENSES: LicenseText[] = [
@@ -172,6 +262,11 @@ export const openBundle = (run: string, over: Partial<ImportBundle> = {}): strin
       monsters: SEED.monsters.filter((m) => m.documentKey !== "secret-book"),
       classes: SEED.classes.filter((c) => c.documentKey !== "secret-book"),
       conditions: SEED.conditions,
+      species: SEED.species.filter((x) => x.documentKey !== "secret-book"),
+      backgrounds: SEED.backgrounds.filter((x) => x.documentKey !== "secret-book"),
+      feats: SEED.feats.filter((x) => x.documentKey !== "secret-book"),
+      weapons: SEED.weapons.filter((x) => x.documentKey !== "secret-book"),
+      armor: SEED.armor.filter((x) => x.documentKey !== "secret-book"),
       ...over,
     },
     run,
@@ -183,7 +278,7 @@ export async function runStatements(statements: string[]): Promise<void> {
 
 /** Removes everything, then loads the Open5e seed (via the real import SQL) and a private document's rows. */
 export async function seedRules(): Promise<void> {
-  const clear = ["spells", "monsters", "classes", "conditions", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
+  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
   const j = (v: unknown) => JSON.stringify(v);
   const priv = [
     env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
@@ -208,6 +303,37 @@ export async function seedRules(): Promise<void> {
       .map((c) =>
         env.DB.prepare("INSERT INTO classes (id, document_key, name, name_search, parent_id, parent_name, data) VALUES (?, ?, ?, ?, 'srd_wizard', 'Wizard', ?)").bind(
           c.id, c.documentKey, c.name, foldName(c.name), j(c),
+        ),
+      ),
+    ...SEED.species
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO species (id, document_key, name, name_search, parent_id, parent_name, data) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(
+          x.id, x.documentKey, x.name, foldName(x.name), x.parentSpecies?.id ?? null, x.parentSpecies?.name ?? null, j(x),
+        ),
+      ),
+    ...SEED.backgrounds
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO backgrounds (id, document_key, name, name_search, data) VALUES (?, ?, ?, ?, ?)").bind(x.id, x.documentKey, x.name, foldName(x.name), j(x)),
+      ),
+    ...SEED.feats
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO feats (id, document_key, name, name_search, prerequisite, data) VALUES (?, ?, ?, ?, NULL, ?)").bind(x.id, x.documentKey, x.name, foldName(x.name), j(x)),
+      ),
+    ...SEED.weapons
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO weapons (id, document_key, name, name_search, category, kind, damage_dice, damage_type, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
+          x.id, x.documentKey, x.name, foldName(x.name), x.category, x.kind, x.damageDice, x.damageType, j(x),
+        ),
+      ),
+    ...SEED.armor
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO armor (id, document_key, name, name_search, category, ac_base, adds_dex_modifier, stealth_disadvantage, ac_display, data) VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?)").bind(
+          x.id, x.documentKey, x.name, foldName(x.name), x.category, x.acBase, x.acDisplay, j(x),
         ),
       ),
   ];

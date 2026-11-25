@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MonsterListQuery, SpellListQuery } from "./api.js";
+import { ArmorListQuery, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MonsterListQuery, SpeciesListQuery, SpellListQuery, WeaponListQuery } from "./api.js";
 import { RecordId } from "./common.js";
 
 describe("list query parsing", () => {
@@ -33,6 +33,24 @@ describe("list query parsing", () => {
     { document: "../etc" },
   ])("rejects %j", (query) => {
     expect(SpellListQuery.safeParse(query).success).toBe(false);
+  });
+});
+
+describe("character option list queries", () => {
+  it("parses species, weapon and armour filters", () => {
+    expect(SpeciesListQuery.parse({ kind: "subspecies", parent: "srd_elf" })).toMatchObject({ kind: "subspecies", parent: "srd_elf" });
+    expect(WeaponListQuery.parse({ category: "martial", kind: "ranged", damageType: "piercing" })).toMatchObject({ category: "martial", kind: "ranged", damageType: "piercing" });
+    expect(ArmorListQuery.parse({ category: "heavy" })).toMatchObject({ category: "heavy" });
+  });
+  it.each([
+    [SpeciesListQuery, { kind: "other" }],
+    [SpeciesListQuery, { parent: "Not A Slug" }],
+    [WeaponListQuery, { category: "exotic" }],
+    [WeaponListQuery, { kind: "thrown" }],
+    [WeaponListQuery, { damageType: "a b" }],
+    [ArmorListQuery, { category: "robe" }],
+  ])("rejects %j", (schema, query) => {
+    expect(schema.safeParse(query).success).toBe(false);
   });
 });
 

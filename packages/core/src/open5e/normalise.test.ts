@@ -1,12 +1,17 @@
-import { Condition, ClassDetail, LicenseText, Monster, SourceDocument, Spell } from "@table-forge/shared";
+import { Armor, Background, Condition, ClassDetail, Feat, LicenseText, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { describe, expect, it } from "vitest";
 import { isDocumentIncluded, OPEN5E_CONTENT_RULES } from "./config.js";
+import { normaliseArmor } from "./armor.js";
+import { normaliseBackground } from "./background.js";
 import { normaliseClass } from "./class.js";
 import { normaliseConditions } from "./condition.js";
 import { normaliseDocument, normaliseLicense } from "./document.js";
 import { foldName } from "../fold.js";
 import * as fx from "./fixtures.js";
+import { normaliseFeat } from "./feat.js";
 import { normaliseMonster } from "./monster.js";
+import { normaliseSpecies, resolveSpeciesParents } from "./species.js";
+import { normaliseWeapon } from "./weapon.js";
 import { buildImportStatements, sqlText } from "./sql.js";
 import { normaliseSpell } from "./spell.js";
 
@@ -155,6 +160,96 @@ describe("normaliseConditions", () => {
   });
 });
 
+describe("normaliseSpecies", () => {
+  it("keeps the traits as free text", () => {
+    const s = normaliseSpecies(fx.elf);
+    expect(Species.parse(s)).toEqual(s);
+    expect(s).toMatchObject({ id: "srd_elf", documentKey: "srd-2014", parentSpecies: null, description: "Elves are a magical people." });
+    expect(s.traits.map((t) => t.name)).toEqual(["Darkvision", "Fey Ancestry"]);
+    expect(s.traits[0]?.description).toContain("60 feet");
+    expect(s.traits[0]?.type).toBeNull();
+  });
+  it("links a subspecies to its parent by key, with a provisional name", () => {
+    const s = normaliseSpecies(fx.highElf);
+    expect(Species.safeParse(s).success).toBe(true);
+    expect(s.parentSpecies).toEqual({ id: "srd_elf", name: "Elf" });
+  });
+  it("resolves parent names, and keeps a subspecies whose parent is not stored", () => {
+    const orphan = normaliseSpecies({ ...fx.highElf, key: "x_orphan", subspecies_of: "srd-2024_half-elf" });
+    const r = resolveSpeciesParents([normaliseSpecies(fx.elf), normaliseSpecies(fx.highElf), orphan]);
+    expect(r.species[1]?.parentSpecies).toEqual({ id: "srd_elf", name: "Elf" });
+    expect(r.species[2]?.parentSpecies).toEqual({ id: null, name: "Half elf" });
+    expect(r.unresolved.map((u) => [u.species.id, u.reason])).toEqual([["x_orphan", "parent not found"]]);
+  });
+  it("says why a subspecies is orphaned", () => {
+    const sub = (id: string, parent: string) => normaliseSpecies({ ...fx.highElf, key: id, subspecies_of: parent });
+    const r = resolveSpeciesParents([normaliseSpecies(fx.elf), sub("x_a", "x_gone"), sub("x_b", "srd_high-elf"), normaliseSpecies(fx.highElf)], new Set(["x_gone"]));
+    expect(r.unresolved.map((u) => [u.species.id, u.reason])).toEqual([
+      ["x_a", "parent failed to normalise"],
+      ["x_b", "parent is itself a subspecies"],
+    ]);
+  });
+});
+
+describe("normaliseBackground", () => {
+  it("keeps the benefits with their types", () => {
+    const b = normaliseBackground(fx.acolyte);
+    expect(Background.parse(b)).toEqual(b);
+    expect(b.benefits.map((x) => [x.name, x.type])).toEqual([
+      ["Shelter of the Faithful", "feature"],
+      ["Skill Proficiencies", "skill_proficiency"],
+    ]);
+  });
+});
+
+describe("normaliseFeat", () => {
+  it("keeps the prerequisite and drops empty benefits", () => {
+    const f = normaliseFeat(fx.grappler);
+    expect(Feat.parse(f)).toEqual(f);
+    expect(f).toMatchObject({ prerequisite: "Strength 13 or higher", category: "GENERAL" });
+    expect(f.benefits).toEqual(["You have advantage on attack rolls against a creature you are grappling."]);
+    expect(normaliseFeat({ ...fx.grappler, prerequisite: "", has_prerequisite: false }).prerequisite).toBeNull();
+  });
+});
+
+describe("normaliseWeapon", () => {
+  it("maps damage, category, properties and range", () => {
+    const w = normaliseWeapon(fx.longsword);
+    expect(Weapon.parse(w)).toEqual(w);
+    expect(w).toMatchObject({ category: "martial", kind: "melee", damageDice: "1d8", damageType: "slashing", range: null });
+    expect(w.properties).toEqual([{ name: "Versatile", detail: "1d10", description: "Two-handed damage in parentheses." }]);
+  });
+  it("tells ranged from melee-with-thrown, including thrown-only ranged weapons", () => {
+    const kind = (raw: Parameters<typeof normaliseWeapon>[0]) => normaliseWeapon(raw).kind;
+    expect(kind(fx.shortbow)).toBe("ranged");
+    expect(kind(fx.heavyCrossbow)).toBe("ranged");
+    expect(kind(fx.dagger)).toBe("melee");
+    expect(kind(fx.dart)).toBe("ranged");
+    expect(normaliseWeapon(fx.shortbow)).toMatchObject({ category: "simple", range: { normalFeet: 80, longFeet: 320 } });
+  });
+  it("keeps a weapon with no damage type, with a null damage type", () => {
+    const w = normaliseWeapon({ ...fx.longsword, damage_type: null });
+    expect(Weapon.parse(w).damageType).toBeNull();
+  });
+});
+
+describe("normaliseArmor", () => {
+  it("maps heavy armour with a strength requirement", () => {
+    const a = normaliseArmor(fx.chainMail);
+    expect(Armor.parse(a)).toEqual(a);
+    expect(a).toMatchObject({ category: "heavy", acBase: 16, addsDexModifier: false, dexModifierCap: null, strengthRequired: 13, stealthDisadvantage: true, acDisplay: "16" });
+  });
+  it("maps a dex cap", () => {
+    expect(normaliseArmor(fx.breastplate)).toMatchObject({ category: "medium", addsDexModifier: true, dexModifierCap: 2, strengthRequired: null, stealthDisadvantage: false });
+  });
+  it.each([["Light armor", "light"], ["MEDIUM", "medium"], [" heavy ", "heavy"], ["shield", "shield"]])("accepts the category %j", (given, want) => {
+    expect(normaliseArmor({ ...fx.chainMail, category: given }).category).toBe(want);
+  });
+  it("throws a clear message for an unknown category", () => {
+    expect(() => normaliseArmor({ ...fx.chainMail, category: "robe" })).toThrow('unknown armor category "robe"');
+  });
+});
+
 describe("normaliseLicense and copyright notice", () => {
   it("keeps the licence text and links known licences", () => {
     const l = normaliseLicense({ key: "ogl-10a", name: "OPEN GAME LICENSE Version 1.0a", desc: "text\r\n15. COPYRIGHT NOTICE " });
@@ -181,6 +276,11 @@ describe("SQL builder", () => {
         monsters: [normaliseMonster(fx.goblin)],
         classes: [normaliseClass(fx.wizard), normaliseClass(fx.evocation)],
         conditions: normaliseConditions(fx.blinded, () => true),
+        species: [normaliseSpecies(fx.elf), normaliseSpecies(fx.highElf)],
+        backgrounds: [normaliseBackground(fx.acolyte)],
+        feats: [normaliseFeat(fx.grappler)],
+        weapons: [normaliseWeapon(fx.longsword)],
+        armor: [normaliseArmor(fx.chainMail)],
       },
       "run-1",
     );
@@ -192,6 +292,13 @@ describe("SQL builder", () => {
     expect(spell).toContain("ON CONFLICT(id) DO UPDATE");
     expect(spell).toContain("origin = 'open5e'");
     expect(statements.filter((s) => s.startsWith("INSERT INTO classes"))).toHaveLength(2);
+    for (const table of ["species", "backgrounds", "feats", "weapons", "armor"]) {
+      const insert = statements.find((s) => s.startsWith(`INSERT INTO ${table} `));
+      expect(insert).toContain("origin = 'open5e'");
+      expect(insert).toContain("ON CONFLICT(id) DO UPDATE");
+    }
+    expect(statements.find((s) => s.startsWith("INSERT INTO weapons"))).toContain("'martial', 'melee', '1d8', 'slashing'");
+    expect(statements.filter((s) => s.startsWith("DELETE FROM armor"))).toHaveLength(1);
   });
 });
 
