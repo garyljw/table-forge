@@ -119,7 +119,7 @@ All three must be normalised into **one internal schema**, modelled on Open5e's 
    - attack and save DCs against the stats
 
    Anything inconsistent is flagged for the owner to check against the book.
-4. An import script loads the data into D1, local first, then remote.
+4. An import script loads the data into D1: local first, then staging, then production. Private book data may go into staging, because previews are behind the same Access allow-list as production. If previews ever become reachable without Access, remove it from staging first.
 
 Transcribe on demand: only content the table actually needs that Open5e lacks.
 
