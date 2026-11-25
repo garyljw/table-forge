@@ -88,7 +88,7 @@ Dashboard settings (Workers & Pages, table-forge, Settings, Builds):
 Things to know:
 
 - Migrations run before the new code goes live, so each one must be backward-compatible with the previous Worker version.
-- All previews share the one staging database. It may carry schema from an unmerged branch, and it must never hold real data.
+- All previews share the one staging database. It may carry schema from an unmerged branch. It may hold the owner's private book data, because previews sit behind the same Access allow-list as production. If previews ever become reachable without Access, remove the private data from staging first.
 
 Loading rules data into a remote database (run by Claude, deliberately explicit):
 
