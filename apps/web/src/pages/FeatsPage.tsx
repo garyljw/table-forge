@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { listFeats } from "../api/rules.js";
-import { Filters, SearchBox, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { useApi } from "../hooks/useApi.js";
@@ -12,6 +12,7 @@ export function FeatsPage() {
   const api = {
     q: params.get("q") ?? undefined,
     document: params.get("document") ?? undefined,
+    core: coreParam(params) ? "true" : undefined,
     page: params.get("page") ?? undefined,
     pageSize: 30,
   };
@@ -22,7 +23,7 @@ export function FeatsPage() {
       <h1>Feats</h1>
       <Filters>
         <SearchBox label="Search feats by name" value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
-        <SourceFilter kind="feats" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="feats" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (

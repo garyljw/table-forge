@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { CORE_RULES_DOCUMENT_KEYS } from "@table-forge/shared";
 import { getDocuments } from "../api/rules.js";
 import type { RuleKind } from "../api/rules.js";
 import { useDebouncedParam, type ParamPatch } from "../hooks/useQueryParams.js";
@@ -57,30 +58,48 @@ export function Check({ label, checked, onChange }: { label: string; checked: bo
   );
 }
 
-/** Source document filter plus the quick "SRD only" toggle. Both write the `document` parameter. */
+const CORE_KEYS: readonly string[] = CORE_RULES_DOCUMENT_KEYS;
+
+/** Whether the URL has the "Core rules" tickbox on. */
+export function coreParam(params: URLSearchParams): boolean {
+  return params.get("core") === "true";
+}
+
+/**
+ * Source document filter plus the quick "Core rules" toggle (the SRD and the owner's PHB, MM and DMG).
+ * They write `core` and `document`, and never both at once with a conflicting value: ticking "Core rules"
+ * clears a non-core source, and choosing a non-core source clears "Core rules".
+ */
 export function SourceFilter({
   kind,
   value,
+  core,
   update,
   showCounts = true,
 }: {
   kind: RuleKind;
   value: string;
+  core: boolean;
   update: (patch: ParamPatch) => void;
   /** Turn off when the list shows only part of the table (one reference kind), as the counts cover the whole table. */
   showCounts?: boolean;
 }) {
   const docs = useApi(() => getDocuments(), "documents");
+  // Keep the selected source in the list even when "Core rules" would hide it, so a conflicting URL
+  // (core=true plus a non-core document) shows why the list is empty and lets the user change it.
   const options =
     docs.status === "ok"
       ? docs.data.items
-          .filter((d) => d.counts[kind] > 0)
+          .filter((d) => d.key === value || (d.counts[kind] > 0 && (!core || CORE_KEYS.includes(d.key))))
           .map((d) => ({ value: d.key, label: showCounts ? `${d.displayName} (${d.counts[kind]})` : d.displayName }))
       : [];
+  const onCore = (on: boolean) =>
+    update({ core: on ? "true" : undefined, ...(on && value !== "" && !CORE_KEYS.includes(value) ? { document: undefined } : {}) });
+  const onSource = (v: string) => update({ document: v, ...(v !== "" && !CORE_KEYS.includes(v) ? { core: undefined } : {}) });
   return (
     <>
-      <Check label="SRD only" checked={value === SRD_KEY} onChange={(on) => update({ document: on ? SRD_KEY : undefined })} />
-      <Select label="Source" value={value} options={options} onChange={(v) => update({ document: v })} />
+      <Check label="Core rules" checked={core} onChange={onCore} />
+      <Select label="Source" value={value} options={options} onChange={onSource} />
     </>
   );
 }

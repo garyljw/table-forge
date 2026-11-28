@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { listSpecies } from "../api/rules.js";
-import { Filters, SearchBox, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { useApi } from "../hooks/useApi.js";
@@ -19,6 +19,7 @@ export function raceApiParams(params: URLSearchParams) {
     q: params.get("q") ?? undefined,
     kind: kind === "all" ? undefined : kind === "subrace" ? "subspecies" : "species",
     document: params.get("document") ?? undefined,
+    core: coreParam(params) ? "true" : undefined,
     page: params.get("page") ?? undefined,
     pageSize: 30,
   };
@@ -43,7 +44,7 @@ export function RacesPage() {
             <option value="all">Races and subraces</option>
           </select>
         </label>
-        <SourceFilter kind="species" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="species" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (

@@ -1,7 +1,7 @@
 import type { MagicItemSummary } from "@table-forge/shared";
 import { Link } from "wouter";
 import { listMagicItems } from "../api/rules.js";
-import { Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { capitalise, keyOptions, rarityLabel, titleKey } from "../format.js";
@@ -25,6 +25,7 @@ export function magicItemApiParams(params: URLSearchParams) {
     rarity: get("rarity"),
     attunement: attunement === "true" || attunement === "false" ? attunement : undefined,
     document: get("document"),
+    core: coreParam(params) ? "true" : undefined,
     page: get("page"),
     pageSize: 30,
   };
@@ -52,7 +53,7 @@ export function MagicItemsPage() {
   const api = magicItemApiParams(params);
   const state = useApi((s) => listMagicItems(api, s), JSON.stringify(api));
   const docNames = useDocNames();
-  const hasFilters = ["q", "type", "rarity", "attunement", "document"].some((k) => params.has(k));
+  const hasFilters = ["q", "type", "rarity", "attunement", "document", "core"].some((k) => params.has(k));
 
   return (
     <section>
@@ -62,7 +63,7 @@ export function MagicItemsPage() {
         <Select label="Type" value={params.get("type") ?? ""} options={keyOptions(MAGIC_ITEM_TYPES)} onChange={(type) => update({ type })} />
         <Select label="Rarity" value={params.get("rarity") ?? ""} options={keyOptions(MAGIC_ITEM_RARITIES)} onChange={(rarity) => update({ rarity })} />
         <Select label="Attunement" value={params.get("attunement") ?? ""} options={ATTUNEMENT_OPTIONS} onChange={(attunement) => update({ attunement })} />
-        <SourceFilter kind="magic_items" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="magic_items" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
         {hasFilters && (
           <Link className="button-link" href="/magic-items" replace>
             Clear filters

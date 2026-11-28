@@ -1,5 +1,5 @@
 import { foldName } from "@table-forge/core";
-import { RULE_TABLES, type RuleTable } from "@table-forge/shared";
+import { CORE_RULES_DOCUMENT_KEYS, RULE_TABLES, type RuleTable } from "@table-forge/shared";
 
 /**
  * Query building for the rules tables. Every value reaches SQL as a bound parameter;
@@ -57,6 +57,15 @@ export class Where {
 
   document(key: string | undefined): this {
     return key === undefined ? this : this.add("t.document_key = ?", key);
+  }
+
+  /**
+   * Narrows to the core rules documents when `on` is true. Only ever adds a condition (ANDed with the
+   * visibility clause), so it cannot widen what a caller may read. Keys are bound parameters.
+   */
+  coreOnly(on: boolean | undefined): this {
+    if (on !== true) return this;
+    return this.add(`t.document_key IN (${CORE_RULES_DOCUMENT_KEYS.map(() => "?").join(", ")})`, ...CORE_RULES_DOCUMENT_KEYS);
   }
 
   get sql(): string {

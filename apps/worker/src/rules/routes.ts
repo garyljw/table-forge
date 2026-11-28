@@ -96,7 +96,7 @@ rulesRoutes.get("/spells", async (c) => {
   const parsed = parseQuery(c, SpellListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.level !== undefined) where.add("t.level = ?", q.level);
   if (q.school !== undefined) where.add("t.school = ?", q.school);
   if (q.class !== undefined) where.add("instr(t.classes, ?) > 0", `,${q.class},`);
@@ -149,7 +149,7 @@ rulesRoutes.get("/monsters", async (c) => {
   const parsed = parseQuery(c, MonsterListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.type !== undefined) where.add("t.type = ?", q.type);
   if (q.size !== undefined) where.add("t.size = ?", q.size);
   if (q.crMin !== undefined) where.add("t.challenge_rating >= ?", q.crMin);
@@ -210,7 +210,7 @@ rulesRoutes.get("/classes", async (c) => {
   const parsed = parseQuery(c, ClassListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.kind === "class") where.add("t.parent_name IS NULL");
   if (q.kind === "subclass") where.add("t.parent_name IS NOT NULL");
   if (q.parent !== undefined) where.add("t.parent_id = ?", q.parent);
@@ -238,7 +238,7 @@ rulesRoutes.get("/conditions", async (c) => {
   const parsed = parseQuery(c, ConditionListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   const { rows, total } = await selectPage<ConditionRow>(c.env.DB, "conditions", "t.id, t.document_key, t.name", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name }));
   return c.json(ConditionListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
@@ -275,7 +275,7 @@ rulesRoutes.get("/species", async (c) => {
   const parsed = parseQuery(c, SpeciesListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.kind === "species") where.add("t.parent_name IS NULL");
   if (q.kind === "subspecies") where.add("t.parent_name IS NOT NULL");
   if (q.parent !== undefined) where.add("t.parent_id = ?", q.parent);
@@ -303,7 +303,7 @@ rulesRoutes.get("/backgrounds", async (c) => {
   const parsed = parseQuery(c, BackgroundListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   const { rows, total } = await selectPage<NamedRow>(c.env.DB, "backgrounds", "t.id, t.document_key, t.name", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name }));
   return c.json(BackgroundListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
@@ -322,7 +322,7 @@ rulesRoutes.get("/feats", async (c) => {
   const parsed = parseQuery(c, FeatListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   const { rows, total } = await selectPage<NamedRow & { prerequisite: string | null }>(
     c.env.DB,
     "feats",
@@ -355,7 +355,7 @@ rulesRoutes.get("/weapons", async (c) => {
   const parsed = parseQuery(c, WeaponListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.category !== undefined) where.add("t.category = ?", q.category);
   if (q.kind !== undefined) where.add("t.kind = ?", q.kind);
   if (q.damageType !== undefined) where.add("t.damage_type = ?", q.damageType);
@@ -402,7 +402,7 @@ rulesRoutes.get("/armor", async (c) => {
   const parsed = parseQuery(c, ArmorListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.category !== undefined) where.add("t.category = ?", q.category);
   const { rows, total } = await selectPage<ArmorRow>(
     c.env.DB,
@@ -450,7 +450,7 @@ rulesRoutes.get("/magic-items", async (c) => {
   const parsed = parseQuery(c, MagicItemListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.type !== undefined) where.add("t.type = ?", q.type);
   if (q.rarity !== undefined) where.add("t.rarity = ?", q.rarity);
   if (q.attunement !== undefined) where.add("t.requires_attunement = ?", q.attunement ? 1 : 0);
@@ -491,7 +491,7 @@ rulesRoutes.get("/roll-tables", async (c) => {
   const parsed = parseQuery(c, RollTableListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.category !== undefined) where.add("t.category = ?", q.category);
   const { rows, total } = await selectPage<RollTableRow>(c.env.DB, "roll_tables", "t.id, t.document_key, t.name, t.category, t.dice", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, category: r.category, dice: r.dice }));
@@ -511,7 +511,7 @@ rulesRoutes.get("/rule-sections", async (c) => {
   const parsed = parseQuery(c, RuleSectionListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.category !== undefined) where.add("t.category = ?", q.category);
   const { rows, total } = await selectPage<NamedRow & { category: string }>(c.env.DB, "rule_sections", "t.id, t.document_key, t.name, t.category", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, category: r.category }));
@@ -531,7 +531,7 @@ rulesRoutes.get("/rule-chapters", async (c) => {
   const parsed = parseQuery(c, RuleChapterListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   const { rows, total } = await selectPage<NamedRow>(c.env.DB, "rule_chapters", "t.id, t.document_key, t.name", where, q.page, q.pageSize, "chapter");
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name }));
   return c.json(RuleChapterListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
@@ -558,7 +558,7 @@ rulesRoutes.get("/rules", async (c) => {
   const parsed = parseQuery(c, RuleListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.chapter !== undefined) where.add("t.chapter_id = ?", q.chapter);
   const { rows, total } = await selectPage<RuleRow>(c.env.DB, "rules", "t.id, t.document_key, t.name, t.chapter_id, t.chapter_name", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, chapterId: r.chapter_id, chapterName: r.chapter_name }));
@@ -584,7 +584,7 @@ rulesRoutes.get("/items", async (c) => {
   const parsed = parseQuery(c, ItemListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.category !== undefined) where.add("t.category = ?", q.category);
   if (q.gear === true) where.add(`t.category NOT IN (${WEAPON_ARMOR_CATEGORIES.map(() => "?").join(", ")})`, ...WEAPON_ARMOR_CATEGORIES);
   const { rows, total } = await selectPage<ItemRow>(c.env.DB, "items", "t.id, t.document_key, t.name, t.category, t.cost_gp, t.weight_lb", where, q.page, q.pageSize);
@@ -605,7 +605,7 @@ rulesRoutes.get("/item-sets", async (c) => {
   const parsed = parseQuery(c, ItemSetListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   const { rows, total } = await selectPage<NamedRow & { item_count: number }>(c.env.DB, "item_sets", "t.id, t.document_key, t.name, t.item_count", where, q.page, q.pageSize);
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, itemCount: r.item_count }));
   return c.json(ItemSetListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
@@ -625,7 +625,7 @@ rulesRoutes.get("/reference", async (c) => {
   const parsed = parseQuery(c, ReferenceListQuery);
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
-  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const where = new Where(scope).nameContains(q.q).document(q.document).coreOnly(q.core);
   if (q.kind !== undefined) where.add("t.kind = ?", q.kind);
   const { rows, total } = await selectPage<{ data: string }>(c.env.DB, "reference_entries", "t.data AS data", where, q.page, q.pageSize, "reference");
   // Like the other routes, a stored row that no longer fits its schema fails the request (a 500) instead of being hidden.

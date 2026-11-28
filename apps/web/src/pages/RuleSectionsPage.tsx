@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { listRuleSections } from "../api/rules.js";
-import { Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { keyOptions, titleKey } from "../format.js";
@@ -12,7 +12,7 @@ export const RULE_SECTION_CATEGORIES = ["optional-rule", "variant-rule", "sideba
 
 export function ruleSectionApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { q: get("q"), category: get("category"), document: get("document"), page: get("page"), pageSize: 30 };
+  return { q: get("q"), category: get("category"), document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 30 };
 }
 
 export function RuleSectionsPage() {
@@ -20,7 +20,7 @@ export function RuleSectionsPage() {
   const api = ruleSectionApiParams(params);
   const state = useApi((s) => listRuleSections(api, s), JSON.stringify(api));
   const docNames = useDocNames();
-  const hasFilters = ["q", "category", "document"].some((k) => params.has(k));
+  const hasFilters = ["q", "category", "document", "core"].some((k) => params.has(k));
 
   return (
     <section>
@@ -28,7 +28,7 @@ export function RuleSectionsPage() {
       <Filters>
         <SearchBox label="Search rules sections by name" value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
         <Select label="Category" value={params.get("category") ?? ""} options={keyOptions(RULE_SECTION_CATEGORIES)} onChange={(category) => update({ category })} />
-        <SourceFilter kind="rule_sections" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="rule_sections" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
         {hasFilters && (
           <Link className="button-link" href="/rules" replace>
             Clear filters

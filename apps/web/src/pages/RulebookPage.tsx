@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { listRuleChapters, listRules } from "../api/rules.js";
-import { Filters, SearchBox, SourceFilter } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, SourceFilter } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { SourceNote } from "../components/SourceNote.js";
 import { Async } from "../components/States.js";
@@ -9,7 +9,7 @@ import { useQueryParams } from "../hooks/useQueryParams.js";
 
 export function rulebookApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { q: get("q"), document: get("document"), page: get("page"), pageSize: 50 };
+  return { q: get("q"), document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 50 };
 }
 
 function Chapters({ params, update }: { params: URLSearchParams; update: ReturnType<typeof useQueryParams>["update"] }) {
@@ -77,14 +77,14 @@ function RuleMatches({ params, update }: { params: URLSearchParams; update: Retu
 export function RulebookPage() {
   const { params, update } = useQueryParams();
   const searching = (params.get("q") ?? "") !== "";
-  const hasFilters = ["q", "document"].some((k) => params.has(k));
+  const hasFilters = ["q", "document", "core"].some((k) => params.has(k));
   return (
     <section>
       <h1>Rulebook</h1>
       <p>The rules text of the SRD, chapter by chapter. Search finds a rule by name.</p>
       <Filters>
         <SearchBox label="Search rules by name" value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
-        <SourceFilter kind={searching ? "rules" : "rule_chapters"} value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind={searching ? "rules" : "rule_chapters"} value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
         {hasFilters && (
           <Link className="button-link" href="/rulebook" replace>
             Clear filters

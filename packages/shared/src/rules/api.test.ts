@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArmorListQuery, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MonsterListQuery, SpeciesListQuery, SpellListQuery, WeaponListQuery } from "./api.js";
+import { ArmorListQuery, CORE_RULES_DOCUMENT_KEYS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MonsterListQuery, SpeciesListQuery, SpellListQuery, WeaponListQuery } from "./api.js";
 import { RecordId } from "./common.js";
 
 describe("list query parsing", () => {
@@ -31,8 +31,19 @@ describe("list query parsing", () => {
     { q: "x".repeat(101) },
     { school: "Evo cation" },
     { document: "../etc" },
+    { core: "1" },
+    { core: "" },
   ])("rejects %j", (query) => {
     expect(SpellListQuery.safeParse(query).success).toBe(false);
+  });
+});
+
+describe("core rules filter", () => {
+  it("parses core as a boolean and lists the core documents", () => {
+    expect(SpellListQuery.parse({ core: "true" }).core).toBe(true);
+    expect(SpellListQuery.parse({ core: "false" }).core).toBe(false);
+    expect(SpellListQuery.parse({}).core).toBeUndefined();
+    expect(CORE_RULES_DOCUMENT_KEYS).toEqual(["srd-2014", "core", "phb-2014", "mm-2014", "dmg-2014"]);
   });
 });
 

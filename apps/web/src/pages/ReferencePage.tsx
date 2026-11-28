@@ -1,7 +1,7 @@
 import { REFERENCE_KINDS, type ReferenceKind } from "@table-forge/shared";
 import { Link } from "wouter";
 import { listReference } from "../api/rules.js";
-import { Filters, SearchBox, SourceFilter } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, SourceFilter } from "../components/FilterBar.js";
 import { ReferenceEntryView } from "../components/ReferenceView.js";
 import { Results } from "../components/Results.js";
 import { SourceNote } from "../components/SourceNote.js";
@@ -31,7 +31,7 @@ export function referenceKind(params: URLSearchParams): ReferenceKind {
 
 export function referenceApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { kind: referenceKind(params), q: get("q"), document: get("document"), page: get("page"), pageSize: 100 };
+  return { kind: referenceKind(params), q: get("q"), document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 100 };
 }
 
 function Tabs({ kind }: { kind: ReferenceKind }) {
@@ -65,7 +65,7 @@ export function ReferencePage() {
       <Tabs kind={kind} />
       <Filters>
         <SearchBox label={`Search ${REFERENCE_KIND_LABELS[kind].toLowerCase()} by name`} value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
-        <SourceFilter kind="reference_entries" showCounts={false} value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="reference_entries" showCounts={false} value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (

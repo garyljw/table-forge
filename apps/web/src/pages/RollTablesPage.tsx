@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { listRollTables } from "../api/rules.js";
-import { Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { keyOptions, titleKey } from "../format.js";
@@ -12,7 +12,7 @@ export const ROLL_TABLE_CATEGORIES = ["treasure", "encounter", "npc", "madness",
 
 export function rollTableApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { q: get("q"), category: get("category"), document: get("document"), page: get("page"), pageSize: 30 };
+  return { q: get("q"), category: get("category"), document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 30 };
 }
 
 export function RollTablesPage() {
@@ -20,7 +20,7 @@ export function RollTablesPage() {
   const api = rollTableApiParams(params);
   const state = useApi((s) => listRollTables(api, s), JSON.stringify(api));
   const docNames = useDocNames();
-  const hasFilters = ["q", "category", "document"].some((k) => params.has(k));
+  const hasFilters = ["q", "category", "document", "core"].some((k) => params.has(k));
 
   return (
     <section>
@@ -28,7 +28,7 @@ export function RollTablesPage() {
       <Filters>
         <SearchBox label="Search roll tables by name" value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
         <Select label="Category" value={params.get("category") ?? ""} options={keyOptions(ROLL_TABLE_CATEGORIES)} onChange={(category) => update({ category })} />
-        <SourceFilter kind="roll_tables" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="roll_tables" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
         {hasFilters && (
           <Link className="button-link" href="/roll-tables" replace>
             Clear filters

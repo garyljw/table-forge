@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { listClasses } from "../api/rules.js";
-import { Filters, SearchBox, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { useApi } from "../hooks/useApi.js";
@@ -24,6 +24,7 @@ export function classApiParams(params: URLSearchParams) {
     q: params.get("q") ?? undefined,
     kind: kind === "all" ? undefined : kind === "subclass" ? "subclass" : "class",
     document: params.get("document") ?? undefined,
+    core: coreParam(params) ? "true" : undefined,
     page: params.get("page") ?? undefined,
     pageSize: 30,
   };
@@ -52,7 +53,7 @@ export function ClassesPage() {
             ))}
           </select>
         </label>
-        <SourceFilter kind="classes" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="classes" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (

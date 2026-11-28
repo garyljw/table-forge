@@ -1,7 +1,7 @@
 import type { SpellSummary } from "@table-forge/shared";
 import { Link } from "wouter";
 import { listSpells } from "../api/rules.js";
-import { Check, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Check, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { capitalise, keyOptions, spellSubtitle, titleKey } from "../format.js";
@@ -33,6 +33,7 @@ export function spellApiParams(params: URLSearchParams) {
     concentration: params.get("concentration") === "true" ? "true" : undefined,
     ritual: params.get("ritual") === "true" ? "true" : undefined,
     document: get("document"),
+    core: coreParam(params) ? "true" : undefined,
     page: get("page"),
     pageSize: 25,
   };
@@ -62,7 +63,7 @@ export function SpellsPage() {
   const api = spellApiParams(params);
   const state = useApi((s) => listSpells(api, s), JSON.stringify(api));
   const docNames = useDocNames();
-  const hasFilters = ["q", "level", "school", "class", "concentration", "ritual", "document"].some((k) => params.has(k));
+  const hasFilters = ["q", "level", "school", "class", "concentration", "ritual", "document", "core"].some((k) => params.has(k));
 
   return (
     <section>
@@ -74,7 +75,7 @@ export function SpellsPage() {
         <Select label="Class" value={params.get("class") ?? ""} options={keyOptions(SPELL_CLASSES)} onChange={(c) => update({ class: c })} />
         <Check label="Concentration" checked={params.get("concentration") === "true"} onChange={(on) => update({ concentration: on ? "true" : undefined })} />
         <Check label="Ritual" checked={params.get("ritual") === "true"} onChange={(on) => update({ ritual: on ? "true" : undefined })} />
-        <SourceFilter kind="spells" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="spells" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
         {hasFilters && (
           <Link className="button-link" href="/spells" replace>
             Clear filters

@@ -1,7 +1,9 @@
+import { foldName } from "@table-forge/core";
+import { env } from "cloudflare:workers";
 import { DocumentListResponse, LicenseListResponse } from "@table-forge/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DISPLAY, EMAIL_BUT_NOT_USER, getAs, NO_IDENTITY, SERVICE_TOKEN, USER, type TestCaller } from "./identities.js";
-import { seedRules } from "./seed.js";
+import { secret, SEED, seedRules } from "./seed.js";
 
 // The seed's private document ("secret-book") holds INVENTED rows, never real book text.
 const PRIVATE_MARKERS = ["Hidden", "secret_", "secret-book", "Secret Book", "PRIVATE"];
@@ -79,6 +81,54 @@ describe("a verified Access user", () => {
   it("does not break the licence listing, and shows no empty licence for private documents", async () => {
     const body = LicenseListResponse.parse(await (await getAs(USER, "/licenses")).json());
     expect(body.items.every((l) => l.text.length > 0 && l.name.length > 0)).toBe(true);
+  });
+});
+
+describe("the core rules filter", () => {
+  // A private "phb-2014" document with one invented spell, standing in for an owner's book.
+  beforeEach(async () => {
+    const doc = { ...secret, key: "phb-2014", name: "Test PHB", displayName: "Test PHB" };
+    const spellRow = { ...SEED.spells[0], id: "phb_core-spell", name: "Core Book Spell", documentKey: "phb-2014" };
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
+        doc.key, doc.name, doc.displayName, doc.gameSystem, JSON.stringify(doc),
+      ),
+      env.DB.prepare("INSERT INTO spells (id, document_key, name, name_search, level, school, classes, concentration, ritual, casting_time, range_text, data) VALUES (?, ?, ?, ?, 1, 'evocation', '', 0, 0, 'action', '60 feet', ?)").bind(
+        spellRow.id, spellRow.documentKey, spellRow.name, foldName(spellRow.name), JSON.stringify(spellRow),
+      ),
+    ]);
+  });
+
+  it("gives a signed-in user SRD and book rows, but no third-party or non-core private rows", async () => {
+    const got = await names(USER, "/spells?core=true");
+    expect(got).toContain("Fireball");
+    expect(got).toContain("Core Book Spell");
+    expect(got).not.toContain("Dark Flame");
+    expect(got).not.toContain("Hidden Fire Spell");
+    expect(await names(USER, "/spells")).toContain("Dark Flame");
+  });
+
+  it.each(DENIED)("gives %s no private rows", async (_label, caller) => {
+    const got = await names(caller, "/spells?core=true");
+    expect(got).toContain("Fireball");
+    expect(got).not.toContain("Core Book Spell");
+    expect(got).not.toContain("Dark Flame");
+    expect(await names(caller, "/spells?core=true&document=phb-2014")).toEqual([]);
+  });
+
+  it("ANDs core with document", async () => {
+    expect(await names(USER, "/spells?core=true&document=tob")).toEqual([]);
+    expect(await names(USER, "/spells?core=true&document=phb-2014")).toEqual(["Core Book Spell"]);
+  });
+
+  it("treats core=false as no filter, and rejects other values", async () => {
+    expect(await names(USER, "/spells?core=false")).toContain("Dark Flame");
+    expect((await getAs(USER, "/spells?core=maybe")).status).toBe(400);
+  });
+
+  it.each(TABLES)("accepts core on /$path without exposing private rows to an anonymous caller", async ({ path, name }) => {
+    expect(await names(NO_IDENTITY, `/${path}?core=true`)).not.toContain(name);
+    expect(await names(USER, `/${path}?core=true`)).not.toContain(name);
   });
 });
 
