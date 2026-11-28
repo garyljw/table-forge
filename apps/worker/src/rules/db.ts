@@ -69,6 +69,20 @@ export interface Page<Row> {
   total: number;
 }
 
+/**
+ * The ORDER BY clauses a list may use. A fixed allow-list: the clause is chosen by key and never built
+ * from request input. Every one ends in `t.id` so paging is stable.
+ */
+const PAGE_ORDERS = {
+  name: "t.name COLLATE NOCASE, t.id",
+  /** Rules chapters, in the SRD's book order. */
+  chapter: "t.sort_index, t.name COLLATE NOCASE, t.id",
+  /** Reference entries: sizes and rarities by rank, everything else (no rank) by name. */
+  reference: "t.sort_rank, t.name COLLATE NOCASE, t.id",
+} as const;
+
+export type PageOrder = keyof typeof PAGE_ORDERS;
+
 /** One page of rows plus the total count, in a single D1 round trip. */
 export async function selectPage<Row>(
   db: D1Database,
@@ -77,12 +91,15 @@ export async function selectPage<Row>(
   where: Where,
   page: number,
   pageSize: number,
+  order: PageOrder = "name",
 ): Promise<Page<Row>> {
+  const orderBy = PAGE_ORDERS[order];
+  if (orderBy === undefined) throw new Error(`unknown page order "${String(order)}"`);
   const from = `FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE ${where.sql}`;
   const [count, rows] = await db.batch([
     db.prepare(`SELECT COUNT(*) AS n ${from}`).bind(...where.params),
     db
-      .prepare(`SELECT ${columns} ${from} ORDER BY t.name COLLATE NOCASE, t.id LIMIT ? OFFSET ?`)
+      .prepare(`SELECT ${columns} ${from} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
       .bind(...where.params, pageSize, (page - 1) * pageSize),
   ]);
   return { rows: (rows?.results ?? []) as Row[], total: Number((count?.results[0] as { n: number } | undefined)?.n ?? 0) };
@@ -108,7 +125,7 @@ export async function selectDetail(
   return row ? { data: JSON.parse(row.data), document: JSON.parse(row.document) } : null;
 }
 
-export type ChildTable = "classes" | "species";
+export type ChildTable = "classes" | "species" | "rules";
 
 /** Fixed query text per table: the table name is never taken from the caller. `columns` is written in this codebase. */
 const CHILD_QUERIES: Record<ChildTable, (columns: string, scope: DocumentScope) => string> = {
@@ -116,9 +133,12 @@ const CHILD_QUERIES: Record<ChildTable, (columns: string, scope: DocumentScope) 
     `SELECT ${columns} FROM classes t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
   species: (columns, scope) =>
     `SELECT ${columns} FROM species t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
+  // The "parent" of a rule is its chapter, and a chapter's rules read in order, not by name.
+  rules: (columns, scope) =>
+    `SELECT ${columns} FROM rules t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.chapter_id = ? ORDER BY t.sort_index, t.id`,
 };
 
-/** Every record visible to `scope` of `table` whose parent is `parentId`, with no paging (a class or species has a few dozen children). */
+/** Every record visible to `scope` of `table` whose parent is `parentId`, with no paging (a class, species or rules chapter has a few dozen children). */
 export async function selectChildren<Row>(db: D1Database, scope: DocumentScope, table: ChildTable, columns: string, parentId: string): Promise<Row[]> {
   const sql = CHILD_QUERIES[table];
   if (sql === undefined) throw new Error(`no children query for table "${String(table)}"`);

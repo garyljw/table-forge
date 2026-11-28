@@ -230,3 +230,92 @@ export interface RawMagicItem {
   /** For example `requires attunement by a paladin`. */
   attunement_detail?: string | null;
 }
+
+/** Most Open5e records name their document with an object; a few (rules, item sets, reference lists) use the bare key. */
+export type RawDocumentField = string | RawDocumentRef;
+
+export interface RawRuleset {
+  key: string;
+  name: string;
+  document: RawDocumentField;
+  desc?: string | null;
+}
+
+export interface RawRule {
+  key: string;
+  name: string;
+  document: RawDocumentField;
+  desc?: string | null;
+  /** Position within its ruleset, starting at 1. */
+  index?: number | null;
+  /** The heading level the rule's own title sits at. */
+  initialHeaderLevel?: number | null;
+  /** Key of the ruleset (chapter) it belongs to. */
+  ruleset?: string | null;
+}
+
+export interface RawItem {
+  key: string;
+  name: string;
+  document: RawDocumentField;
+  desc?: string | null;
+  category?: { key: string; name?: string } | null;
+  /** Present when the item is a weapon; `key` is the weapon record's key. */
+  weapon?: { key: string; name?: string } | null;
+  armor?: { key: string; name?: string } | null;
+  size?: { key: string; name?: string } | null;
+  /** Decimal strings, as Open5e sends them (`"4.000"`, `"10.00"`). */
+  weight?: string | number | null;
+  weight_unit?: string | null;
+  cost?: string | number | null;
+}
+
+export interface RawItemSet {
+  key: string;
+  name: string;
+  document: RawDocumentField;
+  desc?: string | null;
+  items?: { key: string; name?: string }[] | null;
+}
+
+/** One description per source document, as conditions have. */
+export interface RawDescription {
+  desc: string;
+  document: string;
+  gamesystem?: string;
+}
+
+/**
+ * Every reference list (abilities, skills, sizes, ...) in one loose shape. Which fields are present depends
+ * on the kind; the normaliser reads the ones its kind needs and the shared schema checks the result.
+ */
+export interface RawReference {
+  key: string;
+  /** Absent on alignments, which have only a key and a short name. */
+  name?: string | null;
+  /** Absent on item rarities. */
+  document?: RawDocumentField | null;
+  desc?: string | null;
+  descriptions?: RawDescription[] | null;
+  /** Skills: the ability's three-letter key (`dex`). */
+  ability?: string | null;
+  /** Alignments. */
+  morality?: string | null;
+  societal_attitude?: string | null;
+  short_name?: string | null;
+  /** Sizes. */
+  rank?: number | null;
+  space_diameter?: number | null;
+  distance_unit?: string | null;
+  suggested_hit_dice?: string | null;
+  /** Languages. */
+  is_exotic?: boolean | null;
+  is_secret?: boolean | null;
+  script_language?: string | { key: string } | null;
+  /** Environments. */
+  aquatic?: boolean | null;
+  planar?: boolean | null;
+  interior?: boolean | null;
+  /** Weapon properties. */
+  type?: string | null;
+}

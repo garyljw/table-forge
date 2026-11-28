@@ -42,3 +42,68 @@ export const ATTRIBUTION_OVERRIDES: Readonly<Record<string, string>> = {
   "srd-2014":
     'This work includes material taken from the System Reference Document 5.1 ("SRD 5.1") by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License available at https://creativecommons.org/licenses/by/4.0/legalcode.',
 };
+
+/**
+ * Item rarities (common to artifact) have no document in Open5e. They are the rarity scale from the
+ * core rules, so they belong to Open5e's "5e Core Concepts" document, which supplies the other
+ * core reference lists (sizes, languages, schools of magic).
+ */
+export const RARITY_DOCUMENT_KEY = "core";
+
+/**
+ * The 2014 SRD's rules chapters (Open5e ruleset keys) in the order the SRD book presents them.
+ *
+ * Open5e's `/rulesets/` has no order field and returns the chapters alphabetically, so the API order
+ * cannot tell us the book order. A fixed list is the reliable source: it is reviewed by hand and does
+ * not change when Open5e re-sorts. A chapter that is not listed (another document's, or one Open5e adds
+ * later) sorts after these, by name.
+ */
+export const SRD_2014_CHAPTER_ORDER: readonly string[] = [
+  "srd_races",
+  "srd_leveling-up",
+  "srd_multiclassing",
+  "srd_alignment",
+  "srd_languages",
+  "srd_inspiration",
+  "srd_backgrounds",
+  "srd_coins",
+  "srd_selling-treasure",
+  "srd_armor",
+  "srd_weapons",
+  "srd_equipment-packs",
+  "srd_tools",
+  "srd_mounts-and-vehicles",
+  "srd_trade-goods",
+  "srd_expenses",
+  "srd_feats",
+  "srd_abilities",
+  "srd_saving-throws",
+  "srd_time",
+  "srd_movement",
+  "srd_environment",
+  "srd_between-adventures",
+  "srd_combat-sequence",
+  "srd_actions-in-combat",
+  "srd_attacking",
+  "srd_cover",
+  "srd_damage-and-healing",
+  "srd_mounted-combat",
+  "srd_underwater-combat",
+  "srd_spellcasting",
+  "srd_traps",
+  "srd_diseases",
+  "srd_madness",
+  "srd_objects",
+  "srd_poisons",
+  "srd_magic-items",
+  "srd_monsters",
+  "srd_pantheons",
+  "srd_planes",
+  "srd_nonplayer-characters",
+];
+
+/** Sort index for a rules chapter: its position in the SRD order, or a shared last slot when unlisted. */
+export function chapterSortIndex(chapterId: string): number {
+  const at = SRD_2014_CHAPTER_ORDER.indexOf(chapterId);
+  return at === -1 ? SRD_2014_CHAPTER_ORDER.length : at;
+}

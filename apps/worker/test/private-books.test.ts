@@ -36,6 +36,11 @@ const TABLES = [
   { path: "magic-items", name: "Hidden Idol", id: "secret_hidden-idol" },
   { path: "roll-tables", name: "Hidden Table", id: "secret_hidden-table" },
   { path: "rule-sections", name: "Hidden Section", id: "secret_hidden-section" },
+  { path: "rule-chapters", name: "Hidden Chapter", id: "secret_hidden-chapter" },
+  { path: "rules", name: "Hidden Rule", id: "secret_hidden-rule" },
+  { path: "items", name: "Hidden Trinket", id: "secret_hidden-trinket" },
+  { path: "item-sets", name: "Hidden Pack", id: "secret_hidden-pack" },
+  { path: "reference", name: "Hidden Damage", id: "secret-book_damage-type_hidden" },
 ];
 
 describe("a verified Access user", () => {

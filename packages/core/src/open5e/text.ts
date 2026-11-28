@@ -15,3 +15,9 @@ export function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+/** The document key of a record, whether Open5e sent the bare key or a document object. */
+export function documentKeyOf(document: string | { key: string } | null | undefined): string | null {
+  if (document === null || document === undefined) return null;
+  return typeof document === "string" ? document : document.key;
+}

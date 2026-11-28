@@ -17,6 +17,13 @@ import {
   FeatDetailResponse,
   FeatListQuery,
   FeatListResponse,
+  ItemDetailResponse,
+  ItemListQuery,
+  ItemListResponse,
+  ItemSetDetailResponse,
+  ItemSetListQuery,
+  ItemSetListResponse,
+  WEAPON_ARMOR_CATEGORIES,
   LicenseListResponse,
   LicenseText,
   MagicItemDetailResponse,
@@ -26,6 +33,17 @@ import {
   MonsterListQuery,
   MonsterListResponse,
   RecordId,
+  ReferenceDetailResponse,
+  ReferenceEntry,
+  ReferenceListQuery,
+  ReferenceListResponse,
+  Rule,
+  RuleChapterDetailResponse,
+  RuleChapterListQuery,
+  RuleChapterListResponse,
+  RuleDetailResponse,
+  RuleListQuery,
+  RuleListResponse,
   RollTableDetailResponse,
   RollTableListQuery,
   RollTableListResponse,
@@ -508,6 +526,121 @@ rulesRoutes.get("/rule-sections/:id", async (c) => {
   return c.json(RuleSectionDetailResponse.parse(found));
 });
 
+rulesRoutes.get("/rule-chapters", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, RuleChapterListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const { rows, total } = await selectPage<NamedRow>(c.env.DB, "rule_chapters", "t.id, t.document_key, t.name", where, q.page, q.pageSize, "chapter");
+  const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name }));
+  return c.json(RuleChapterListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/rule-chapters/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "rule_chapters", id.data) : null;
+  if (!id.success || !found) return notFound(c, "Rules chapter");
+  const rows = await selectChildren<{ data: string }>(c.env.DB, scope, "rules", "t.data AS data", id.data);
+  // Like the other routes, a stored row that no longer fits its schema fails the request (a 500) instead of being hidden.
+  const rules = rows.map((r) => Rule.parse(JSON.parse(r.data)));
+  return c.json(RuleChapterDetailResponse.parse({ ...found, rules }));
+});
+
+interface RuleRow extends NamedRow {
+  chapter_id: string | null;
+  chapter_name: string | null;
+}
+
+rulesRoutes.get("/rules", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, RuleListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  if (q.chapter !== undefined) where.add("t.chapter_id = ?", q.chapter);
+  const { rows, total } = await selectPage<RuleRow>(c.env.DB, "rules", "t.id, t.document_key, t.name, t.chapter_id, t.chapter_name", where, q.page, q.pageSize);
+  const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, chapterId: r.chapter_id, chapterName: r.chapter_name }));
+  return c.json(RuleListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/rules/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "rules", id.data) : null;
+  if (!found) return notFound(c, "Rule");
+  return c.json(RuleDetailResponse.parse(found));
+});
+
+interface ItemRow extends NamedRow {
+  category: string;
+  cost_gp: number;
+  weight_lb: number | null;
+}
+
+rulesRoutes.get("/items", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, ItemListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  if (q.category !== undefined) where.add("t.category = ?", q.category);
+  if (q.gear === true) where.add(`t.category NOT IN (${WEAPON_ARMOR_CATEGORIES.map(() => "?").join(", ")})`, ...WEAPON_ARMOR_CATEGORIES);
+  const { rows, total } = await selectPage<ItemRow>(c.env.DB, "items", "t.id, t.document_key, t.name, t.category, t.cost_gp, t.weight_lb", where, q.page, q.pageSize);
+  const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, category: r.category, costGp: r.cost_gp, weightLb: r.weight_lb }));
+  return c.json(ItemListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/items/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "items", id.data) : null;
+  if (!found) return notFound(c, "Item");
+  return c.json(ItemDetailResponse.parse(found));
+});
+
+rulesRoutes.get("/item-sets", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, ItemSetListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  const { rows, total } = await selectPage<NamedRow & { item_count: number }>(c.env.DB, "item_sets", "t.id, t.document_key, t.name, t.item_count", where, q.page, q.pageSize);
+  const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name, itemCount: r.item_count }));
+  return c.json(ItemSetListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/item-sets/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "item_sets", id.data) : null;
+  if (!found) return notFound(c, "Item set");
+  return c.json(ItemSetDetailResponse.parse(found));
+});
+
+/** Reference entries are small, so the list carries the whole record (description included) and the page can show it inline. */
+rulesRoutes.get("/reference", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const parsed = parseQuery(c, ReferenceListQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.query;
+  const where = new Where(scope).nameContains(q.q).document(q.document);
+  if (q.kind !== undefined) where.add("t.kind = ?", q.kind);
+  const { rows, total } = await selectPage<{ data: string }>(c.env.DB, "reference_entries", "t.data AS data", where, q.page, q.pageSize, "reference");
+  // Like the other routes, a stored row that no longer fits its schema fails the request (a 500) instead of being hidden.
+  const items = rows.map((r) => ReferenceEntry.parse(JSON.parse(r.data)));
+  return c.json(ReferenceListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
+});
+
+rulesRoutes.get("/reference/:id", async (c) => {
+  const scope = documentScopeFor(c.get("identity"));
+  const id = RecordId.safeParse(c.req.param("id"));
+  const found = id.success ? await selectDetail(c.env.DB, scope, "reference_entries", id.data) : null;
+  if (!found) return notFound(c, "Reference entry");
+  return c.json(ReferenceDetailResponse.parse(found));
+});
+
 /** Every document visible to the caller, with how many records of each type it supplies. For the credits page. */
 rulesRoutes.get("/documents", async (c) => {
   const { docs, counts } = await selectDocuments(c.env.DB, documentScopeFor(c.get("identity")));
@@ -531,6 +664,11 @@ rulesRoutes.get("/documents", async (c) => {
         magic_items: countFor(9, document.key),
         roll_tables: countFor(10, document.key),
         rule_sections: countFor(11, document.key),
+        rule_chapters: countFor(12, document.key),
+        rules: countFor(13, document.key),
+        items: countFor(14, document.key),
+        item_sets: countFor(15, document.key),
+        reference_entries: countFor(16, document.key),
       },
     };
   });

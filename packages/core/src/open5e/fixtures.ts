@@ -1,6 +1,6 @@
 // Small hand-written fixtures modelled on Open5e v2 responses. SRD 5.1 text only
 // (CC-BY-4.0); "Test Wyrm" is invented to cover the fields the SRD records lack.
-import type { RawArmor, RawMagicItem, RawBackground, RawClass, RawCondition, RawCreature, RawDocument, RawFeat, RawSpecies, RawSpell, RawWeapon } from "./raw.js";
+import type { RawArmor, RawItem, RawItemSet, RawReference, RawRule, RawRuleset, RawMagicItem, RawBackground, RawClass, RawCondition, RawCreature, RawDocument, RawFeat, RawSpecies, RawSpell, RawWeapon } from "./raw.js";
 
 export const srdDocument: RawDocument = {
   key: "srd-2014",
@@ -379,3 +379,181 @@ export const testCharm: RawMagicItem = {
   requires_attunement: true,
   attunement_detail: "Requires Attunement by a Cleric",
 };
+
+// ---- Rules text, equipment and reference lists ----
+
+export const combatChapter: RawRuleset = {
+  key: "srd_combat-sequence",
+  name: "Combat Sequence",
+  document: { key: "srd-2014", name: "System Reference Document 5.1", gamesystem: { key: "5e-2014" } },
+  desc: "A typical combat encounter is a clash between two sides.\r\n",
+};
+
+export const surpriseRule: RawRule = {
+  key: "srd_combat-sequence_surprise",
+  name: "Surprise",
+  document: "srd-2014",
+  desc: "The DM determines who might be surprised.\r\n\r\n### Details\r\n\r\nA surprised creature cannot move or take an action.",
+  index: 2,
+  initialHeaderLevel: 3,
+  ruleset: "srd_combat-sequence",
+};
+
+export const initiativeRule: RawRule = { ...surpriseRule, key: "srd_combat-sequence_initiative", name: "Initiative", desc: "Initiative determines the order of turns.", index: 1, initialHeaderLevel: 2 };
+
+export const srdDocRef = { key: "srd-2014", name: "System Reference Document 5.1", gamesystem: { key: "5e-2014" } };
+
+export const rope: RawItem = {
+  key: "srd_rope",
+  name: "Hempen Rope",
+  document: srdDocRef,
+  desc: "Rope, whether made of hemp or silk, has 2 hit points.",
+  category: { key: "adventuring-gear", name: "Adventuring Gear" },
+  weapon: null,
+  armor: null,
+  size: { key: "tiny", name: "Tiny" },
+  weight: "10.000",
+  weight_unit: "lb",
+  cost: "1.00",
+};
+
+export const battleaxeItem: RawItem = {
+  ...rope,
+  key: "srd_battleaxe",
+  name: "Battleaxe",
+  desc: "A battleaxe.",
+  category: { key: "weapon", name: "Weapon" },
+  weapon: { key: "srd_battleaxe", name: "Battleaxe" },
+  weight: "4.000",
+  cost: "10.00",
+};
+
+export const breastplateItem: RawItem = {
+  ...rope,
+  key: "srd_breastplate",
+  name: "Breastplate",
+  desc: "Fitted metal chest piece.",
+  category: { key: "armor", name: "Armor" },
+  armor: { key: "srd_breastplate", name: "Breastplate" },
+  weight: "20.000",
+  cost: "400.00",
+};
+
+export const acidItem: RawItem = { ...rope, key: "srd_acid", name: "Acid", desc: "Splash it.", cost: "0.00", weight: null, size: null };
+
+export const dungeoneersPack: RawItemSet = {
+  key: "dungeoneers-pack",
+  name: "Dungeoneer's Pack",
+  document: "srd-2014",
+  desc: "Includes a backpack and 50 feet of hempen rope.",
+  items: [
+    { key: "srd_backpack", name: "Backpack" },
+    { key: "srd_rope", name: "Hempen Rope" },
+    // An item from the 2024 rules, which is not imported.
+    { key: "srd-2024_rope", name: "Rope" },
+    { key: "srd_backpack", name: "Backpack" },
+  ],
+};
+
+export const abilityStrength: RawReference = {
+  key: "str",
+  name: "Strength",
+  document: "core",
+  descriptions: [
+    { desc: "A5E strength.", document: "a5e-ag", gamesystem: "a5e" },
+    { desc: "Strength measures bodily power.\r\n\r\n### Strength Checks", document: "srd-2014", gamesystem: "5e-2014" },
+    { desc: "2024 strength.", document: "srd-2024", gamesystem: "5e-2024" },
+  ],
+};
+
+export const skillAthletics: RawReference = {
+  key: "athletics",
+  name: "Athletics",
+  document: "core",
+  ability: "str",
+  descriptions: [{ desc: "Your Strength (Athletics) check covers difficult situations.", document: "srd-2014", gamesystem: "5e-2014" }],
+};
+
+export const skillCulture: RawReference = {
+  key: "a5e-ag_culture",
+  name: "Culture",
+  document: "a5e-ag",
+  ability: "int",
+  descriptions: [{ desc: "A5E culture.", document: "a5e-ag", gamesystem: "a5e" }],
+};
+
+export const sizeLarge: RawReference = {
+  key: "large",
+  name: "Large",
+  document: { key: "core", name: "5e Core Concepts", gamesystem: { key: "5e-2014" } },
+  distance_unit: "feet",
+  rank: 4,
+  space_diameter: 10,
+  suggested_hit_dice: "d10",
+};
+
+export const rarityRare: RawReference = { key: "rare", name: "Rare", rank: 3 };
+
+export const languageAbyssal: RawReference = {
+  key: "abyssal",
+  name: "Abyssal",
+  document: { key: "core", name: "5e Core Concepts", gamesystem: { key: "5e-2014" } },
+  desc: "Typical speakers are demons.",
+  is_exotic: true,
+  is_secret: false,
+  script_language: "infernal",
+};
+
+export const environmentAbyss: RawReference = {
+  key: "srd_abyss",
+  name: "The Abyss",
+  document: "srd-2014",
+  desc: "[None provided]",
+  aquatic: false,
+  planar: true,
+  interior: false,
+};
+
+// Open5e sends no `name` for alignments.
+export const alignmentLG: RawReference = {
+  key: "lawful-good",
+  document: { key: "core", name: "5e Core Concepts", gamesystem: { key: "5e-2014" } },
+  morality: "good",
+  societal_attitude: "lawful",
+  short_name: "LG",
+  descriptions: [{ desc: "Lawful good creatures do the right thing.", document: "srd-2014", gamesystem: "5e-2014" }],
+};
+
+export const propertyFinesse: RawReference = {
+  key: "srd-2014_light",
+  name: "Finesse",
+  document: "srd-2014",
+  desc: "Use your choice of Strength or Dexterity.",
+  type: null,
+};
+
+export const creatureTypeBeast: RawReference = {
+  key: "beast",
+  name: "Beast",
+  document: "core",
+  descriptions: [{ desc: "Beasts are nonhumanoid creatures.", document: "srd-2014", gamesystem: "5e-2014" }],
+};
+
+export const damageTypeAcid: RawReference = {
+  key: "acid",
+  name: "Acid",
+  document: "core",
+  descriptions: [
+    { desc: "Corrosive spray.", document: "srd-2014", gamesystem: "5e-2014" },
+    { desc: "Corrosive liquids.", document: "srd-2024", gamesystem: "5e-2024" },
+  ],
+};
+
+export const schoolAbjuration: RawReference = {
+  key: "abjuration",
+  name: "Abjuration",
+  document: "core",
+  desc: "**Abjuration** spells are protective.",
+};
+
+export const categoryTools: RawReference = { key: "tools", name: "Tools", document: { key: "core", name: "5e Core Concepts" } };

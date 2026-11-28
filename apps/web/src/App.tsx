@@ -11,10 +11,13 @@ import {
   ArmorDetailPage,
   BackgroundDetailPage,
   ClassDetailPage,
+  ItemDetailPage,
+  ItemSetDetailPage,
   FeatDetailPage,
   MagicItemDetailPage,
   MonsterDetailPage,
   RollTableDetailPage,
+  RuleChapterPage,
   RuleSectionDetailPage,
   SpeciesDetailPage,
   SpellDetailPage,
@@ -24,6 +27,8 @@ import { HomePage } from "./pages/HomePage.js";
 import { MagicItemsPage } from "./pages/MagicItemsPage.js";
 import { MonstersPage } from "./pages/MonstersPage.js";
 import { RacesPage } from "./pages/RacesPage.js";
+import { ReferencePage } from "./pages/ReferencePage.js";
+import { RulebookPage } from "./pages/RulebookPage.js";
 import { RollTablesPage } from "./pages/RollTablesPage.js";
 import { RuleSectionsPage } from "./pages/RuleSectionsPage.js";
 import { SpellsPage } from "./pages/SpellsPage.js";
@@ -38,7 +43,9 @@ const NAV = [
   { href: "/equipment", label: "Equipment" },
   { href: "/magic-items", label: "Magic items" },
   { href: "/roll-tables", label: "Roll tables" },
-  { href: "/rules", label: "Rules" },
+  { href: "/rulebook", label: "Rules" },
+  { href: "/reference", label: "Reference" },
+  { href: "/rules", label: "Rules sections" },
   { href: "/conditions", label: "Conditions" },
   { href: "/credits", label: "Credits" },
 ];
@@ -128,11 +135,16 @@ export function App() {
             <Route path="/feats/:id">{(p: { id: string }) => <FeatDetailPage id={p.id} />}</Route>
             <Route path="/equipment" component={EquipmentPage} />
             <Route path="/equipment/weapons/:id">{(p: { id: string }) => <WeaponDetailPage id={p.id} />}</Route>
+            <Route path="/equipment/gear/:id">{(p: { id: string }) => <ItemDetailPage id={p.id} />}</Route>
+            <Route path="/equipment/packs/:id">{(p: { id: string }) => <ItemSetDetailPage id={p.id} />}</Route>
             <Route path="/equipment/armor/:id">{(p: { id: string }) => <ArmorDetailPage id={p.id} />}</Route>
             <Route path="/magic-items" component={MagicItemsPage} />
             <Route path="/magic-items/:id">{(p: { id: string }) => <MagicItemDetailPage id={p.id} />}</Route>
             <Route path="/roll-tables" component={RollTablesPage} />
             <Route path="/roll-tables/:id">{(p: { id: string }) => <RollTableDetailPage id={p.id} />}</Route>
+            <Route path="/rulebook" component={RulebookPage} />
+            <Route path="/rulebook/:id">{(p: { id: string }) => <RuleChapterPage id={p.id} />}</Route>
+            <Route path="/reference" component={ReferencePage} />
             <Route path="/rules" component={RuleSectionsPage} />
             <Route path="/rules/:id">{(p: { id: string }) => <RuleSectionDetailPage id={p.id} />}</Route>
             <Route path="/conditions" component={ConditionsPage} />

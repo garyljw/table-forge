@@ -11,13 +11,23 @@ import {
   DocumentListResponse,
   FeatDetailResponse,
   FeatListResponse,
+  ItemDetailResponse,
+  ItemListResponse,
+  ItemSetDetailResponse,
+  ItemSetListResponse,
   LicenseListResponse,
   MagicItemDetailResponse,
   MagicItemListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
+  ReferenceDetailResponse,
+  ReferenceListResponse,
   RollTableDetailResponse,
   RollTableListResponse,
+  RuleChapterDetailResponse,
+  RuleChapterListResponse,
+  RuleDetailResponse,
+  RuleListResponse,
   RuleSectionDetailResponse,
   RuleSectionListResponse,
   SpeciesDetailResponse,
@@ -488,6 +498,187 @@ describe("rule sections", () => {
   });
 });
 
+describe("rules chapters and rules", () => {
+  it("lists chapters by name, with filters", async () => {
+    const list = RuleChapterListResponse.parse(await (await get("/rule-chapters")).json());
+    expect(list.items.map((c) => c.name)).toEqual(["Test Combat", "Test Extras", "Test Magic"]);
+    expect(await names("/rule-chapters?q=magic")).toEqual(["Test Magic"]);
+    expect(await names("/rule-chapters?document=tob")).toEqual(["Test Extras"]);
+    expect(await names("/rule-chapters?pageSize=2&page=2")).toEqual(["Test Magic"]);
+  });
+
+  it("lists chapters in book order, not name order, with unlisted ones last by name", async () => {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE rule_chapters SET sort_index = 1 WHERE id = 'srd_test-magic'"),
+      env.DB.prepare("UPDATE rule_chapters SET sort_index = 5 WHERE id = 'srd_test-combat'"),
+    ]);
+    expect(await names("/rule-chapters")).toEqual(["Test Magic", "Test Combat", "Test Extras"]);
+    expect(await names("/rule-chapters?pageSize=2&page=2")).toEqual(["Test Extras"]);
+  });
+
+  it("fails the chapter, rather than hiding a rule, when a stored rule no longer fits its schema", async () => {
+    await env.DB.prepare("UPDATE rules SET data = json_remove(data, '$.body') WHERE id = 'srd_test-combat_attack'").run();
+    expect((await get("/rule-chapters/srd_test-combat")).status).toBe(500);
+  });
+
+  it("returns a chapter with its rules in reading order, not name order", async () => {
+    const detail = RuleChapterDetailResponse.parse(await (await get("/rule-chapters/srd_test-combat")).json());
+    expect(detail.data).toMatchObject({ name: "Test Combat", description: "Test Combat introduction" });
+    expect(detail.rules.map((r) => [r.name, r.order, r.headerLevel])).toEqual([
+      ["Surprise", 1, 3],
+      ["Attack", 2, 2],
+    ]);
+    expect(detail.rules[0]?.body).toBe("Be **surprised**.");
+    expect(detail.document.key).toBe("srd-2014");
+    const empty = RuleChapterDetailResponse.parse(await (await get("/rule-chapters/tob_test-extras")).json());
+    expect(empty.rules.map((r) => r.name)).toEqual(["Extra Rule"]);
+  });
+
+  it("lists rules, filtered by chapter, name and source", async () => {
+    const list = RuleListResponse.parse(await (await get("/rules")).json());
+    expect(list.items.map((r) => r.name)).toEqual(["Attack", "Extra Rule", "Orphan Rule", "Spell Slots", "Surprise"]);
+    expect(list.items.find((r) => r.name === "Attack")).toMatchObject({ chapterId: "srd_test-combat", chapterName: "Test Combat" });
+    expect(list.items.find((r) => r.name === "Orphan Rule")).toMatchObject({ chapterId: null, chapterName: null });
+    expect(await names("/rules?chapter=srd_test-combat")).toEqual(["Attack", "Surprise"]);
+    expect(await names("/rules?q=slots")).toEqual(["Spell Slots"]);
+    expect(await names("/rules?document=tob")).toEqual(["Extra Rule"]);
+  });
+
+  it("returns a rule's text", async () => {
+    const detail = RuleDetailResponse.parse(await (await get("/rules/srd_test-combat_surprise")).json());
+    expect(detail.data).toMatchObject({ body: "Be **surprised**.", order: 1, headerLevel: 3 });
+  });
+
+  it("never serves a private document's chapter or rule, and 404s unknown ids", async () => {
+    expect(JSON.stringify(await (await get("/rule-chapters")).json())).not.toContain("Hidden");
+    expect(JSON.stringify(await (await get("/rules")).json())).not.toContain("Hidden");
+    expect((await get("/rule-chapters/secret_hidden-chapter")).status).toBe(404);
+    expect((await get("/rules/secret_hidden-rule")).status).toBe(404);
+    expect((await get("/rules/srd_nope")).status).toBe(404);
+  });
+
+  it("leaves a private rule out of a public chapter's rules", async () => {
+    // A private rule that claims a public chapter must not show up in it.
+    await env.DB.prepare("UPDATE rules SET chapter_id = 'srd_test-combat' WHERE id = 'secret_hidden-rule'").run();
+    const detail = RuleChapterDetailResponse.parse(await (await get("/rule-chapters/srd_test-combat")).json());
+    expect(detail.rules.map((r) => r.name)).toEqual(["Surprise", "Attack"]);
+  });
+
+  it("rejects bad parameters", async () => {
+    expect((await get("/rules?chapter=Not%20A%20Slug")).status).toBe(400);
+    expect((await get("/rule-chapters?pageSize=1000")).status).toBe(400);
+  });
+});
+
+describe("items", () => {
+  it("lists with cost and weight, ordered by name", async () => {
+    const list = ItemListResponse.parse(await (await get("/items")).json());
+    expect(list.items.map((i) => i.name)).toEqual(["Test Chain Mail", "Test Gadget", "Test Longsword", "Test Lute", "Test Rope", "Test Shield"]);
+    expect(list.items.find((i) => i.name === "Test Rope")).toMatchObject({ category: "adventuring-gear", costGp: 1, weightLb: 10 });
+    expect(list.items.find((i) => i.name === "Test Gadget")).toMatchObject({ costGp: 0, weightLb: null });
+  });
+
+  it("filters by category, gear-only, source and name", async () => {
+    expect(await names("/items?category=tools")).toEqual(["Test Gadget", "Test Lute"]);
+    expect(await names("/items?category=weapon")).toEqual(["Test Longsword"]);
+    expect(await names("/items?gear=true")).toEqual(["Test Gadget", "Test Lute", "Test Rope"]);
+    expect(await names("/items?gear=false")).toHaveLength(6);
+    expect(await names("/items?gear=true&category=weapon")).toEqual([]);
+    expect(await names("/items?document=tob")).toEqual(["Test Gadget"]);
+    expect(await names("/items?q=lute")).toEqual(["Test Lute"]);
+  });
+
+  it("paginates", async () => {
+    const page = ItemListResponse.parse(await (await get("/items?pageSize=4&page=2")).json());
+    expect(page).toMatchObject({ page: 2, pageSize: 4, total: 6, totalPages: 2 });
+    expect(page.items.map((i) => i.name)).toEqual(["Test Rope", "Test Shield"]);
+  });
+
+  it("returns the full record, with its weapon and armour links", async () => {
+    const sword = ItemDetailResponse.parse(await (await get("/items/srd_test-longsword")).json());
+    expect(sword.data).toMatchObject({ weaponId: "srd_longsword", armorId: null, description: "Test Longsword description" });
+    const mail = ItemDetailResponse.parse(await (await get("/items/srd_test-chain-mail")).json());
+    expect(mail.data.armorId).toBe("srd_chain-mail");
+    expect(mail.document.key).toBe("srd-2014");
+  });
+
+  it("never serves a private item, and rejects bad parameters", async () => {
+    expect(JSON.stringify(await (await get("/items")).json())).not.toContain("Hidden");
+    expect((await get("/items/secret_hidden-trinket")).status).toBe(404);
+    expect((await get("/items/srd_nope")).status).toBe(404);
+    expect((await get("/items?gear=maybe")).status).toBe(400);
+    expect((await get("/items?category=Tools")).status).toBe(400);
+  });
+});
+
+describe("item sets", () => {
+  it("lists with the item count", async () => {
+    const list = ItemSetListResponse.parse(await (await get("/item-sets")).json());
+    expect(list.items.map((s) => [s.name, s.itemCount])).toEqual([["Test Focuses", 0], ["Test Pack", 2], ["Test Set", 1]]);
+    expect(await names("/item-sets?document=tob")).toEqual(["Test Set"]);
+    expect(await names("/item-sets?q=pack")).toEqual(["Test Pack"]);
+  });
+
+  it("returns the contents in order", async () => {
+    const detail = ItemSetDetailResponse.parse(await (await get("/item-sets/test-pack")).json());
+    expect(detail.data.items).toEqual([{ id: "srd_test-rope", name: "Test Rope" }, { id: "srd_test-lute", name: "Test Lute" }]);
+    expect(detail.data.description).toBe("Test Pack description");
+  });
+
+  it("never serves a private set", async () => {
+    expect(JSON.stringify(await (await get("/item-sets")).json())).not.toContain("Hidden");
+    expect((await get("/item-sets/secret_hidden-pack")).status).toBe(404);
+    expect((await get("/item-sets/nope")).status).toBe(404);
+  });
+});
+
+describe("reference entries", () => {
+  it("lists every kind with its own fields and the description", async () => {
+    const list = ReferenceListResponse.parse(await (await get("/reference")).json());
+    expect(list.total).toBe(9);
+    const abyssal = list.items.find((e) => e.name === "Abyssal");
+    expect(abyssal).toMatchObject({ kind: "language", exotic: true, script: "infernal", description: "Abyssal description" });
+    expect(list.items.find((e) => e.name === "Large")).toMatchObject({ kind: "size", rank: 4, spaceFeet: 10, hitDie: "d10" });
+    expect(JSON.stringify(list)).not.toContain("Hidden");
+  });
+
+  it("filters by kind, source and name", async () => {
+    expect(await names("/reference?kind=size")).toEqual(["Tiny", "Large"]);
+    expect(await names("/reference?kind=language")).toEqual(["Abyssal", "Common", "Void Speech"]);
+    expect(await names("/reference?kind=language&document=tob")).toEqual(["Void Speech"]);
+    expect(await names("/reference?q=acid")).toEqual(["Acid"]);
+    expect(await names("/reference?kind=skill&q=acid")).toEqual([]);
+  });
+
+  it("paginates", async () => {
+    const page = ReferenceListResponse.parse(await (await get("/reference?pageSize=4&page=3")).json());
+    expect(page).toMatchObject({ page: 3, pageSize: 4, total: 9, totalPages: 3 });
+    expect(page.items).toHaveLength(1);
+  });
+
+  it("returns one entry and its document", async () => {
+    const detail = ReferenceDetailResponse.parse(await (await get("/reference/srd-2014_skill_athletics")).json());
+    expect(detail.data).toMatchObject({ kind: "skill", ability: "strength" });
+    expect(detail.document.key).toBe("srd-2014");
+  });
+
+  it("puts sizes in rank order, not name order", async () => {
+    // Large (rank 4) sorts before Tiny (rank 0) by name, so the rank order is what puts Tiny first.
+    expect(await names("/reference?kind=size")).toEqual(["Tiny", "Large"]);
+  });
+
+  it("fails the list, rather than hiding a row, when a stored row no longer fits its schema", async () => {
+    await env.DB.prepare("UPDATE reference_entries SET data = json_remove(data, '$.rank') WHERE id = 'srd-2014_size_large'").run();
+    expect((await get("/reference?kind=size")).status).toBe(500);
+  });
+
+  it("never serves a private entry, and rejects bad parameters", async () => {
+    expect((await get("/reference/secret-book_damage-type_hidden")).status).toBe(404);
+    expect((await get("/reference/nope")).status).toBe(404);
+    expect((await get("/reference?kind=spell")).status).toBe(400);
+  });
+});
+
 describe("dmOnly is data only", () => {
   it("does not hide or change anything yet: flagged records are still served to everyone", async () => {
     await env.DB.batch([
@@ -512,7 +703,7 @@ describe("documents", () => {
     const body = DocumentListResponse.parse(await (await get("/documents")).json());
     expect(body.items.map((d) => d.key)).toEqual(["srd-2014", "tob"]);
     const srd = body.items[0];
-    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3, magic_items: 3, roll_tables: 2, rule_sections: 2 });
+    expect(srd?.counts).toEqual({ spells: 5, monsters: 3, classes: 3, conditions: 2, species: 3, backgrounds: 1, feats: 1, weapons: 4, armor: 3, magic_items: 3, roll_tables: 2, rule_sections: 2, rule_chapters: 2, rules: 4, items: 5, item_sets: 2, reference_entries: 8 });
     expect(srd?.attribution).toBe("SRD ATTRIBUTION TEXT");
     expect(body.items[1]?.copyrightNotice).toBe("Tome of Beasts Copyright 2016, Kobold Press.");
     expect(JSON.stringify(body)).not.toContain("secret-book");

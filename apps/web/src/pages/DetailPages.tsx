@@ -1,11 +1,29 @@
+import { useEffect } from "react";
 import { Link } from "wouter";
-import { getArmor, getBackground, getClass, getFeat, getMagicItem, getMonster, getRollTable, getRuleSection, getSpecies, getSpell, getWeapon } from "../api/rules.js";
+import {
+  getArmor,
+  getBackground,
+  getClass,
+  getFeat,
+  getItem,
+  getItemSet,
+  getMagicItem,
+  getMonster,
+  getRollTable,
+  getRuleChapter,
+  getRuleSection,
+  getSpecies,
+  getSpell,
+  getWeapon,
+} from "../api/rules.js";
 import { ErrorNote, Loading } from "../components/States.js";
 import { SourceLine } from "../components/SourceLine.js";
 import { SpellCard } from "../components/SpellCard.js";
 import { StatBlock } from "../components/StatBlock.js";
 import { ClassView } from "../components/ClassView.js";
 import { ArmorView, BackgroundView, FeatView, MagicItemView, SpeciesView, WeaponView } from "../components/OptionViews.js";
+import { ItemSetView, ItemView } from "../components/ItemViews.js";
+import { RuleChapterView } from "../components/RulebookViews.js";
 import { RuleSectionView } from "../components/RuleSectionView.js";
 import { RollTableView } from "../components/RollTableView.js";
 import { useApi, type ApiState } from "../hooks/useApi.js";
@@ -201,6 +219,74 @@ export function RuleSectionDetailPage({ id }: { id: string }) {
       render={(r) => (
         <>
           <RuleSectionView section={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function ItemDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getItem(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/equipment?tab=gear", label: "All gear" }}
+      render={(r) => (
+        <>
+          <ItemView item={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function ItemSetDetailPage({ id }: { id: string }) {
+  const state = useApi((s) => getItemSet(id, s), id);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/equipment?tab=packs", label: "All packs and sets" }}
+      render={(r) => (
+        <>
+          <ItemSetView set={r.data} />
+          <SourceLine document={r.document} />
+        </>
+      )}
+    />
+  );
+}
+
+export function RuleChapterPage({ id }: { id: string }) {
+  const state = useApi((s) => getRuleChapter(id, s), id);
+  // A link from the rules search lands on `#<rule id>`; scroll there once the chapter has rendered,
+  // and again whenever the hash changes while the chapter stays open.
+  const loaded = state.status === "ok";
+  useEffect(() => {
+    if (!loaded) return;
+    const scrollToHash = () => {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+      let target = hash;
+      try {
+        target = decodeURIComponent(hash);
+      } catch {
+        // A malformed escape: use the text as written.
+      }
+      document.getElementById(target)?.scrollIntoView();
+    };
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
+  }, [loaded, id]);
+  return (
+    <DetailFrame
+      state={state}
+      back={{ href: "/rulebook", label: "All chapters" }}
+      render={(r) => (
+        <>
+          <RuleChapterView detail={r} />
           <SourceLine document={r.document} />
         </>
       )}

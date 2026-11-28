@@ -6,9 +6,12 @@ import { DocumentKey } from "./common.js";
 import { Condition, ConditionSummary } from "./condition.js";
 import { LicenseText, SourceDocument } from "./document.js";
 import { Feat, FeatSummary } from "./feat.js";
+import { Item, ItemCategoryKey, ItemSet, ItemSetSummary, ItemSummary } from "./item.js";
 import { MagicItem, MagicItemRarity, MagicItemSummary, MagicItemType } from "./magic-item.js";
 import { Monster, MonsterSummary } from "./monster.js";
+import { ReferenceEntry, ReferenceKind } from "./reference.js";
 import { RollTable, RollTableCategory, RollTableSummary } from "./roll-table.js";
+import { Rule, RuleChapter, RuleChapterSummary, RuleSummary } from "./rulebook.js";
 import { RuleSection, RuleSectionCategory, RuleSectionSummary } from "./rule-section.js";
 import { Species, SpeciesSummary } from "./species.js";
 import { Spell, SpellLevel, SpellSummary } from "./spell.js";
@@ -126,6 +129,30 @@ export const RuleSectionListQuery = ListQueryBase.extend({
 });
 export type RuleSectionListQuery = z.infer<typeof RuleSectionListQuery>;
 
+export const RuleChapterListQuery = ListQueryBase;
+export type RuleChapterListQuery = z.infer<typeof RuleChapterListQuery>;
+
+export const RuleListQuery = ListQueryBase.extend({
+  /** Only rules in this chapter. */
+  chapter: slugParam.optional(),
+});
+export type RuleListQuery = z.infer<typeof RuleListQuery>;
+
+export const ItemListQuery = ListQueryBase.extend({
+  category: ItemCategoryKey.optional(),
+  /** `true` leaves out weapon, armour and shield items, which have their own pages. */
+  gear: boolParam.optional(),
+});
+export type ItemListQuery = z.infer<typeof ItemListQuery>;
+
+export const ItemSetListQuery = ListQueryBase;
+export type ItemSetListQuery = z.infer<typeof ItemSetListQuery>;
+
+export const ReferenceListQuery = ListQueryBase.extend({
+  kind: ReferenceKind.optional(),
+});
+export type ReferenceListQuery = z.infer<typeof ReferenceListQuery>;
+
 // ---- Response bodies ----
 
 export const paginated = <T extends z.ZodType>(item: T) =>
@@ -206,6 +233,34 @@ export type RuleSectionListResponse = z.infer<typeof RuleSectionListResponse>;
 export const RuleSectionDetailResponse = detail(RuleSection);
 export type RuleSectionDetailResponse = z.infer<typeof RuleSectionDetailResponse>;
 
+export const RuleChapterListResponse = paginated(RuleChapterSummary);
+export type RuleChapterListResponse = z.infer<typeof RuleChapterListResponse>;
+export const RuleChapterDetailResponse = detail(RuleChapter).extend({
+  /** The chapter's rules, in reading order, with their text. */
+  rules: z.array(Rule),
+});
+export type RuleChapterDetailResponse = z.infer<typeof RuleChapterDetailResponse>;
+
+export const RuleListResponse = paginated(RuleSummary);
+export type RuleListResponse = z.infer<typeof RuleListResponse>;
+export const RuleDetailResponse = detail(Rule);
+export type RuleDetailResponse = z.infer<typeof RuleDetailResponse>;
+
+export const ItemListResponse = paginated(ItemSummary);
+export type ItemListResponse = z.infer<typeof ItemListResponse>;
+export const ItemDetailResponse = detail(Item);
+export type ItemDetailResponse = z.infer<typeof ItemDetailResponse>;
+
+export const ItemSetListResponse = paginated(ItemSetSummary);
+export type ItemSetListResponse = z.infer<typeof ItemSetListResponse>;
+export const ItemSetDetailResponse = detail(ItemSet);
+export type ItemSetDetailResponse = z.infer<typeof ItemSetDetailResponse>;
+
+export const ReferenceListResponse = paginated(ReferenceEntry);
+export type ReferenceListResponse = z.infer<typeof ReferenceListResponse>;
+export const ReferenceDetailResponse = detail(ReferenceEntry);
+export type ReferenceDetailResponse = z.infer<typeof ReferenceDetailResponse>;
+
 /** `GET /api/rules/documents`: every document with public records, for the credits page. */
 export const DocumentListResponse = z.object({
   items: z.array(
@@ -223,6 +278,11 @@ export const DocumentListResponse = z.object({
         magic_items: z.number().int(),
         roll_tables: z.number().int(),
         rule_sections: z.number().int(),
+        rule_chapters: z.number().int(),
+        rules: z.number().int(),
+        items: z.number().int(),
+        item_sets: z.number().int(),
+        reference_entries: z.number().int(),
       }),
     }),
   ),

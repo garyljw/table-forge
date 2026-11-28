@@ -5,9 +5,14 @@ import {
   type ClassDetail,
   type Condition,
   type Feat,
+  type Item,
+  type ItemSet,
   type LicenseText,
   type MagicItem,
   type Monster,
+  type ReferenceEntry,
+  type Rule,
+  type RuleChapter,
   type RuleTable,
   type SourceDocument,
   type Species,
@@ -15,6 +20,7 @@ import {
   type Weapon,
 } from "@table-forge/shared";
 import { foldName } from "../fold.js";
+import { chapterSortIndex } from "./config.js";
 
 /**
  * SQL for an Open5e import. The tables are defined in apps/worker/migrations.
@@ -43,6 +49,11 @@ export interface ImportBundle {
   weapons: Weapon[];
   armor: Armor[];
   magicItems: MagicItem[];
+  ruleChapters: RuleChapter[];
+  rules: Rule[];
+  items: Item[];
+  itemSets: ItemSet[];
+  referenceEntries: ReferenceEntry[];
 }
 
 /** D1 rejects statements over 100 KB. */
@@ -315,6 +326,93 @@ export function magicItemStatement(m: MagicItem, run: string): string {
   );
 }
 
+export function ruleChapterStatement(c: RuleChapter, run: string): string {
+  return recordUpsert(
+    "rule_chapters",
+    c.documentKey,
+    [
+      ["id", sqlText(c.id)],
+      ["document_key", sqlText(c.documentKey)],
+      ["name", sqlText(c.name)],
+      ["name_search", sqlText(foldName(c.name))],
+      ["sort_index", sqlInt(chapterSortIndex(c.id))],
+      ["data", json(c)],
+    ],
+    run,
+  );
+}
+
+export function ruleStatement(r: Rule, run: string): string {
+  return recordUpsert(
+    "rules",
+    r.documentKey,
+    [
+      ["id", sqlText(r.id)],
+      ["document_key", sqlText(r.documentKey)],
+      ["chapter_id", sqlNullableText(r.chapterId)],
+      ["chapter_name", sqlNullableText(r.chapterName)],
+      ["name", sqlText(r.name)],
+      ["name_search", sqlText(foldName(r.name))],
+      ["sort_index", sqlInt(r.order)],
+      ["data", json(r)],
+    ],
+    run,
+  );
+}
+
+export function itemStatement(i: Item, run: string): string {
+  return recordUpsert(
+    "items",
+    i.documentKey,
+    [
+      ["id", sqlText(i.id)],
+      ["document_key", sqlText(i.documentKey)],
+      ["name", sqlText(i.name)],
+      ["name_search", sqlText(foldName(i.name))],
+      ["category", sqlText(i.category)],
+      ["cost_gp", sqlInt(i.costGp)],
+      ["weight_lb", i.weightLb === null ? "NULL" : sqlInt(i.weightLb)],
+      ["weapon_id", sqlNullableText(i.weaponId)],
+      ["armor_id", sqlNullableText(i.armorId)],
+      ["data", json(i)],
+    ],
+    run,
+  );
+}
+
+export function itemSetStatement(s: ItemSet, run: string): string {
+  return recordUpsert(
+    "item_sets",
+    s.documentKey,
+    [
+      ["id", sqlText(s.id)],
+      ["document_key", sqlText(s.documentKey)],
+      ["name", sqlText(s.name)],
+      ["name_search", sqlText(foldName(s.name))],
+      ["item_count", sqlInt(s.itemCount)],
+      ["data", json(s)],
+    ],
+    run,
+  );
+}
+
+export function referenceEntryStatement(e: ReferenceEntry, run: string): string {
+  return recordUpsert(
+    "reference_entries",
+    e.documentKey,
+    [
+      ["id", sqlText(e.id)],
+      ["kind", sqlText(e.kind)],
+      ["document_key", sqlText(e.documentKey)],
+      ["name", sqlText(e.name)],
+      ["name_search", sqlText(foldName(e.name))],
+      ["sort_rank", "rank" in e ? sqlInt(e.rank) : "NULL"],
+      ["data", json(e)],
+    ],
+    run,
+  );
+}
+
 /** Deletes Open5e rows that this run did not stamp. Always the last statements of an import. */
 export function staleRowStatements(run: string): string[] {
   const stale = `import_run IS NOT ${sqlText(run)}`;
@@ -349,6 +447,11 @@ export function buildImportStatements(bundle: ImportBundle, run: string): string
     ...bundle.weapons.map((x) => weaponStatement(x, run)),
     ...bundle.armor.map((x) => armorStatement(x, run)),
     ...bundle.magicItems.map((x) => magicItemStatement(x, run)),
+    ...bundle.ruleChapters.map((x) => ruleChapterStatement(x, run)),
+    ...bundle.rules.map((x) => ruleStatement(x, run)),
+    ...bundle.items.map((x) => itemStatement(x, run)),
+    ...bundle.itemSets.map((x) => itemSetStatement(x, run)),
+    ...bundle.referenceEntries.map((x) => referenceEntryStatement(x, run)),
     ...staleRowStatements(run),
   ];
 }
