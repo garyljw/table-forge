@@ -62,7 +62,8 @@ describe("rules chapters and rules", () => {
 
 describe("chapter order", () => {
   it("follows the SRD book order, with unlisted chapters after the listed ones", () => {
-    expect(chapterSortIndex("srd_leveling-up")).toBe(0);
+    expect(chapterSortIndex("srd_races")).toBe(0);
+    expect(chapterSortIndex("srd_leveling-up")).toBe(1);
     expect(chapterSortIndex("srd_combat-sequence")).toBeLessThan(chapterSortIndex("srd_spellcasting"));
     expect(chapterSortIndex("srd_abilities")).toBeLessThan(chapterSortIndex("srd_combat-sequence"));
     expect(chapterSortIndex("srd-2024_combat")).toBe(SRD_2014_CHAPTER_ORDER.length);
