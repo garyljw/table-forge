@@ -93,13 +93,13 @@ describe("an owner of the private book", () => {
 describe("the core rules filter", () => {
   // The owner of both private books used below.
   beforeEach(async () => {
-    await own(USER.email, "secret-book", "phb-2014");
+    await own(USER.email, "secret-book", "dmg-2014");
   });
 
-  // A private "phb-2014" document with one invented spell, standing in for an owner's book.
+  // A private "dmg-2014" document with one invented spell, standing in for an owner's book.
   beforeEach(async () => {
-    const doc = { ...secret, key: "phb-2014", name: "Test PHB", displayName: "Test PHB" };
-    const spellRow = { ...SEED.spells[0], id: "phb_core-spell", name: "Core Book Spell", documentKey: "phb-2014" };
+    const doc = { ...secret, key: "dmg-2014", name: "Test DMG", displayName: "Test DMG" };
+    const spellRow = { ...SEED.spells[0], id: "phb_core-spell", name: "Core Book Spell", documentKey: "dmg-2014" };
     await env.DB.batch([
       env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
         doc.key, doc.name, doc.displayName, doc.gameSystem, JSON.stringify(doc),
@@ -124,12 +124,12 @@ describe("the core rules filter", () => {
     expect(got).toContain("Fireball");
     expect(got).not.toContain("Core Book Spell");
     expect(got).not.toContain("Dark Flame");
-    expect(await names(caller, "/spells?core=true&document=phb-2014")).toEqual([]);
+    expect(await names(caller, "/spells?core=true&document=dmg-2014")).toEqual([]);
   });
 
   it("ANDs core with document", async () => {
     expect(await names(USER, "/spells?core=true&document=tob")).toEqual([]);
-    expect(await names(USER, "/spells?core=true&document=phb-2014")).toEqual(["Core Book Spell"]);
+    expect(await names(USER, "/spells?core=true&document=dmg-2014")).toEqual(["Core Book Spell"]);
   });
 
   it("treats core=false as no filter, and rejects other values", async () => {
