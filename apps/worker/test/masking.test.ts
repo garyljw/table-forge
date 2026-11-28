@@ -1,10 +1,9 @@
 import { DocumentListResponse } from "@table-forge/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getAs, OTHER_USER, SERVICE_TOKEN, USER, type TestCaller } from "./identities.js";
-import { addBook, own, seedRules } from "./seed.js";
 import { env } from "cloudflare:workers";
 import { foldName } from "@table-forge/core";
-import { spell } from "./seed.js";
+import { getAs, OTHER_USER, SERVICE_TOKEN, USER, type TestCaller } from "./identities.js";
+import { addBook, own, seedRules, spell } from "./seed.js";
 import { maskingClause } from "../src/rules/db.js";
 
 // Whole-book rule: owning `mm-2014` hides every `srd-2014` monster; owning `phb-2014` hides every `srd-2014` spell. All rows are invented.
