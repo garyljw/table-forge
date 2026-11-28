@@ -10,7 +10,9 @@ export default defineConfig(async () => {
       cloudflareTest({
         // Test config has no static-assets binding, so tests don't need a web build.
         wrangler: { configPath: "./wrangler.test.jsonc" },
-        miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
+        // ADMIN_EMAILS stands in for the production secret. Set here (not in wrangler.test.jsonc) so a developer's
+        // local .dev.vars cannot change what the tests see.
+        miniflare: { bindings: { TEST_MIGRATIONS: migrations, ADMIN_EMAILS: "admin@example.com" } },
       }),
     ],
     test: { include: ["test/**/*.test.ts"], setupFiles: ["./test/setup.ts"] },

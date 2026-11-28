@@ -11,5 +11,7 @@ declare namespace Cloudflare {
     ACCESS_AUD: string;
     /** Local dev only, from .dev.vars. Never set in a wrangler config. */
     ACCESS_DEV_IDENTITY?: string;
+    /** Secret (`wrangler secret put ADMIN_EMAILS`; `.dev.vars` locally): comma-separated emails of the app owner(s). Never in a wrangler config. Missing means nobody is admin. */
+    ADMIN_EMAILS?: string;
   }
 }

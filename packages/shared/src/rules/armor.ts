@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId, DmOnly } from "./common.js";
+import { DocumentKey, RecordId, DmOnly, Supersedes } from "./common.js";
 
 export const ArmorCategory = z.enum(["light", "medium", "heavy", "shield"]);
 export type ArmorCategory = z.infer<typeof ArmorCategory>;
@@ -7,6 +7,7 @@ export type ArmorCategory = z.infer<typeof ArmorCategory>;
 /** Armour and shields. Small and flat, so the list and the detail share one shape. */
 export const Armor = z.object({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   id: RecordId,
   documentKey: DocumentKey,
   name: z.string().min(1),

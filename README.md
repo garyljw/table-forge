@@ -62,7 +62,15 @@ cp apps/worker/.dev.vars.example apps/worker/.dev.vars
 
 This sets `ACCESS_DEV_IDENTITY=dev@example.com`, a bypass that is honoured only for requests to `localhost` or `127.0.0.1` that did not come through Cloudflare's edge (no `cf-ray` header). `.dev.vars` is gitignored and never deployed; no wrangler config contains this variable. **Warning:** the bypass trusts the request's host name, which a LAN client can fake. Never expose the dev servers beyond localhost (no `vite --host`, no `wrangler dev --ip 0.0.0.0`, no tunnels) while `.dev.vars` contains `ACCESS_DEV_IDENTITY`, and never set `ACCESS_DEV_IDENTITY` as a Cloudflare dashboard variable or secret. Local dev is for the laptop only; test on phones and the TV through the Access-protected preview URL.
 
-Local D1 state is keyed by `database_id`. After a fresh clone, or if the id in `wrangler.jsonc` changes, run `pnpm --filter @table-forge/worker exec wrangler d1 migrations apply DB --local` and then `pnpm import:open5e`.
+Local D1 state is keyed by `database_id`. `pnpm dev` applies any pending migrations to the local database before it starts. After a fresh clone, or if the id in `wrangler.jsonc` changes, run `pnpm dev` once (or `pnpm --filter @table-forge/worker exec wrangler d1 migrations apply DB --local`) and then `pnpm import:open5e`.
+
+`.dev.vars.example` also sets `ADMIN_EMAILS=dev@example.com`, so the local dev identity is the admin and can open **Book owners** (`/admin/books`).
+
+### Book ownership
+
+Private book data is shown only to people the admin has ticked as owning that book on the **Book owners** page. Everyone else sees public (SRD/Open5e) content only. Where a book record has `supersedes` set to an SRD record's id, owners of that book see the book version instead of the SRD one.
+
+The admin is whoever is listed in the `ADMIN_EMAILS` secret (comma-separated, case-insensitive). If it is missing, nobody is admin and nobody can be granted books. It is a secret, not a `wrangler.jsonc` var, so no email is in the public repo. Set it with `pnpm --filter @table-forge/worker exec wrangler secret put ADMIN_EMAILS` (production) and again with `--config wrangler.staging.jsonc` or in the dashboard for previews. The admin does not own any book automatically, so tick yourself too.
 
 Without the file, `pnpm dev` runs but every `/api` route except `/api/health` returns 401.
 

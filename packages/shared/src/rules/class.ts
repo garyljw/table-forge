@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId, DmOnly } from "./common.js";
+import { DocumentKey, RecordId, DmOnly, Supersedes } from "./common.js";
 
 /**
  * A subclass's parent. `id` is null when the source's parent is not a class we store; the subclass
@@ -41,6 +41,7 @@ export type ClassSummary = z.infer<typeof ClassSummary>;
 
 export const ClassDetail = ClassSummary.extend({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   description: z.string(),
   hitPoints: z
     .object({

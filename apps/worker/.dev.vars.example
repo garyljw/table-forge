@@ -2,3 +2,6 @@
 # Local-dev auth bypass: wrangler dev has no Cloudflare Access in front of it, so requests
 # are treated as this user. Only honoured for localhost/127.0.0.1 requests. Never deployed.
 ACCESS_DEV_IDENTITY=dev@example.com
+# The app owner(s), comma-separated. Can open the admin page and tick who owns which book.
+# In production set it with: wrangler secret put ADMIN_EMAILS
+ADMIN_EMAILS=dev@example.com

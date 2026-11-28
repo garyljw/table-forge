@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Armor, ArmorCategory } from "./armor.js";
 import { Background, BackgroundSummary } from "./background.js";
 import { ClassDetail, ClassSummary } from "./class.js";
-import { DocumentKey } from "./common.js";
+import { DocumentKey, RecordId } from "./common.js";
 import { Condition, ConditionSummary } from "./condition.js";
 import { LicenseText, SourceDocument } from "./document.js";
 import { Feat, FeatSummary } from "./feat.js";
@@ -173,7 +173,13 @@ export const paginated = <T extends z.ZodType>(item: T) =>
   });
 
 /** A detail response: the record plus the document it came from, for attribution. */
-export const detail = <T extends z.ZodType>(data: T) => z.object({ data, document: SourceDocument });
+export const detail = <T extends z.ZodType>(data: T) =>
+  z.object({
+    data,
+    document: SourceDocument,
+    /** Set only when a book record the caller may read replaces this one: the id to show instead. Never set for a caller who cannot read that book. */
+    supersededBy: RecordId.optional(),
+  });
 
 export const SpellListResponse = paginated(SpellSummary);
 export type SpellListResponse = z.infer<typeof SpellListResponse>;

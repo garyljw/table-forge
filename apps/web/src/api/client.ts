@@ -58,3 +58,26 @@ export async function apiGet<T>(
     throw new ApiRequestError("The server sent data in an unexpected shape.", res.status);
   }
 }
+
+/**
+ * Send JSON with PUT (or another method) and validate the answer against a shared schema.
+ * The server is the real gate; a refusal comes back as an `ApiRequestError` with its status.
+ */
+export async function apiSend<T>(method: "PUT" | "POST" | "DELETE", path: string, body: unknown, schema: Parser<T>): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, { method, headers: { accept: "application/json", "content-type": "application/json" }, body: JSON.stringify(body) });
+  } catch {
+    throw new ApiRequestError("Could not reach the server. Check your connection and try again.");
+  }
+  if (!res.ok) {
+    if (res.status === 403) throw new ApiRequestError("You are not allowed to do that.", 403);
+    if (res.status === 400) throw new ApiRequestError("The server did not accept that.", 400);
+    throw new ApiRequestError(`The server answered ${res.status}.`, res.status);
+  }
+  try {
+    return schema.parse(await res.json());
+  } catch {
+    throw new ApiRequestError("The server sent data in an unexpected shape.", res.status);
+  }
+}

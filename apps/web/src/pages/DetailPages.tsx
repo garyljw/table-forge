@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
+import { useEffect, useRef } from "react";
+import { Link, useLocation } from "wouter";
 import {
   getArmor,
   getBackground,
@@ -37,6 +37,24 @@ function DetailFrame<T>({
   back: { href: string; label: string };
   render: (data: T) => React.ReactNode;
 }) {
+  // An old link to a record an owned book replaces: go to the replacement, without keeping the old page in history.
+  // `hop` remembers where this component last sent the reader, so a replacement that itself says "superseded" is
+  // shown rather than followed (one hop at most). A ref survives StrictMode's double effect run; repeating the
+  // same replace-navigation is harmless.
+  const [location, navigate] = useLocation();
+  const hop = useRef<string | null>(null);
+  const supersededBy = state.status === "ok" ? (state.data as { supersededBy?: string }).supersededBy : undefined;
+  const target =
+    supersededBy !== undefined && /^[a-z0-9][a-z0-9_-]*$/.test(supersededBy) && supersededBy !== location.split("/").pop() && hop.current !== location
+      ? location.replace(/[^/]+$/, supersededBy)
+      : null;
+  useEffect(() => {
+    if (target === null) return;
+    hop.current = target;
+    navigate(target, { replace: true });
+  }, [target, navigate]);
+  // While the redirect is pending, never show the superseded record.
+  if (target !== null) return <Loading />;
   return (
     <section>
       <p className="back">

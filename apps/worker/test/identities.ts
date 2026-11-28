@@ -19,6 +19,10 @@ export const SERVICE_TOKEN = { kind: "service", sub: "svc-1" } as unknown as Ide
 export const DISPLAY = { kind: "display", sub: "tv-1" } as unknown as Identity;
 /** A caller carrying an email but not of kind "user": still denied. */
 export const EMAIL_BUT_NOT_USER = { kind: "display", email: "tv@example.com", sub: "tv-2" } as unknown as Identity;
+/** A signed-in user who owns no private book (and is not admin). */
+export const OTHER_USER: Identity = { kind: "user", email: "other@example.com", sub: "user-2" };
+/** The app owner, per `ADMIN_EMAILS` in wrangler.test.jsonc. */
+export const ADMIN: Identity = { kind: "user", email: "admin@example.com", sub: "admin-1" };
 /** The default non-private caller. */
 export const NO_PRIVATE_ACCESS: TestCaller = SERVICE_TOKEN;
 

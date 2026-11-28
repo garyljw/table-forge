@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DmOnly, DocumentKey, RecordId } from "./common.js";
+import { DmOnly, Supersedes, DocumentKey, RecordId } from "./common.js";
 
 /** Item categories (`adventuring-gear`, `weapon`, `armor`, ...) as Open5e keys them. */
 export const ItemCategoryKey = z
@@ -25,6 +25,7 @@ export type ItemSummary = z.infer<typeof ItemSummary>;
 /** An ordinary (non-magic) item of equipment: gear, tools, trade goods, mounts, vehicles. */
 export const Item = ItemSummary.extend({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   /** Markdown. */
   description: z.string(),
   /** The size category Open5e records for the item; not a reliable guide for most gear. */
@@ -47,6 +48,7 @@ export type ItemSetSummary = z.infer<typeof ItemSetSummary>;
 /** An equipment pack or a named group of items (arcane focuses, artisan's tools, light armour). */
 export const ItemSet = ItemSetSummary.extend({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   /** Markdown. */
   description: z.string(),
   /** The items it holds. Open5e gives no quantities; the description says how many of each. */

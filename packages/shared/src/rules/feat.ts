@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId, DmOnly } from "./common.js";
+import { DocumentKey, RecordId, DmOnly, Supersedes } from "./common.js";
 
 export const FeatSummary = z.object({
   id: RecordId,
@@ -12,6 +12,7 @@ export type FeatSummary = z.infer<typeof FeatSummary>;
 
 export const Feat = FeatSummary.extend({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   /** Open5e's feat type (e.g. `GENERAL`), when given. */
   category: z.string().nullable(),
   description: z.string(),

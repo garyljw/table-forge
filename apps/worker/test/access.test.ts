@@ -1,5 +1,5 @@
 import { MeResponse } from "@table-forge/shared";
-import { exports } from "cloudflare:workers";
+import { env as testEnv, exports } from "cloudflare:workers";
 import { createExecutionContext } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
@@ -20,7 +20,7 @@ describe("Access JWT verification", () => {
   it("accepts a valid token and exposes the identity", async () => {
     const res = await authedFetch(ME);
     expect(res.status).toBe(200);
-    expect(MeResponse.parse(await res.json())).toEqual({ email: "player@example.com" });
+    expect(MeResponse.parse(await res.json())).toEqual({ email: "player@example.com", isAdmin: false });
   });
 
   it("accepts an array audience that includes ours", async () => {
@@ -101,7 +101,7 @@ describe("routes", () => {
 
 // The bypass and the missing-config case need different bindings, so call the app directly with a custom env.
 describe("dev bypass and fail-closed config", () => {
-  const baseEnv = { DB: undefined as never, ACCESS_TEAM_DOMAIN: "test-team.cloudflareaccess.com", ACCESS_AUD: AUD };
+  const baseEnv = { DB: testEnv.DB, ACCESS_TEAM_DOMAIN: "test-team.cloudflareaccess.com", ACCESS_AUD: AUD };
   const call = (url: string, env: Record<string, unknown>, headers: Record<string, string> = {}) =>
     app.fetch(new Request(url, { headers }), { ...baseEnv, ...env } as never, createExecutionContext());
 
@@ -109,8 +109,13 @@ describe("dev bypass and fail-closed config", () => {
     for (const host of ["http://localhost:8787", "http://127.0.0.1:8787"]) {
       const res = await call(`${host}/api/me`, { ACCESS_DEV_IDENTITY: "dev@example.com" });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ email: "dev@example.com" });
+      expect(await res.json()).toEqual({ email: "dev@example.com", isAdmin: false });
     }
+  });
+
+  it("reports isAdmin for an address in ADMIN_EMAILS, ignoring case and spaces", async () => {
+    const res = await call("http://localhost:8787/api/me", { ACCESS_DEV_IDENTITY: "dev@example.com", ADMIN_EMAILS: "x@y.z,  DEV@Example.com " });
+    expect(await res.json()).toEqual({ email: "dev@example.com", isAdmin: true });
   });
 
   it("refuses the bypass for any other host", async () => {

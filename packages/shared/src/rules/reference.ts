@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AbilityKey, DmOnly, DocumentKey, RecordId } from "./common.js";
+import { AbilityKey, DmOnly, Supersedes, DocumentKey, RecordId } from "./common.js";
 
 /** The kinds of reference entry. One table holds them all; `kind` tells them apart. */
 export const REFERENCE_KINDS = [
@@ -23,6 +23,7 @@ const base = {
   id: RecordId,
   documentKey: DocumentKey,
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   name: z.string().min(1),
   /** Markdown. Empty when the source gives none. */
   description: z.string(),

@@ -11,6 +11,15 @@ beforeEach(async () => {
 });
 
 describe("Open5e import SQL", () => {
+  it("writes a record's `supersedes` to supersedes_id, and null when absent", async () => {
+    await runStatements(openBundle("run-2", { spells: [spell("srd_fireball", "Fireball", { supersedes: "srd_old" }), spell("srd_fire-bolt", "Fire Bolt")] }));
+    const rows = (await env.DB.prepare("SELECT id, supersedes_id FROM spells WHERE id IN ('srd_fireball', 'srd_fire-bolt') ORDER BY id").all()).results;
+    expect(rows).toEqual([
+      { id: "srd_fire-bolt", supersedes_id: null },
+      { id: "srd_fireball", supersedes_id: "srd_old" },
+    ]);
+  });
+
   it("is idempotent", async () => {
     const before = await ids("spells");
     await runStatements(openBundle("run-2"));
