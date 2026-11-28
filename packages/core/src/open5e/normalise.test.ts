@@ -9,7 +9,10 @@ import { normaliseDocument, normaliseLicense } from "./document.js";
 import { foldName } from "../fold.js";
 import * as fx from "./fixtures.js";
 import { normaliseFeat } from "./feat.js";
+import { normaliseItem, normaliseItemSet } from "./item.js";
 import { normaliseMagicItem } from "./magic-item.js";
+import { normaliseReference } from "./reference.js";
+import { normaliseRule, normaliseRuleChapter } from "./rulebook.js";
 import { normaliseMonster } from "./monster.js";
 import { normaliseSpecies, resolveSpeciesParents } from "./species.js";
 import { normaliseWeapon } from "./weapon.js";
@@ -286,6 +289,11 @@ describe("SQL builder", () => {
         weapons: [normaliseWeapon(fx.longsword)],
         armor: [normaliseArmor(fx.chainMail)],
         magicItems: [normaliseMagicItem(fx.testBlade)],
+        ruleChapters: [normaliseRuleChapter(fx.combatChapter)],
+        rules: [normaliseRule(fx.surpriseRule, new Map([["srd_combat-sequence", "Combat Sequence"]]))],
+        items: [normaliseItem(fx.rope)],
+        itemSets: [normaliseItemSet(fx.dungeoneersPack, () => true)],
+        referenceEntries: normaliseReference("skill", fx.skillAthletics, () => true),
       },
       "run-1",
     );
@@ -297,7 +305,7 @@ describe("SQL builder", () => {
     expect(spell).toContain("ON CONFLICT(id) DO UPDATE");
     expect(spell).toContain("origin = 'open5e'");
     expect(statements.filter((s) => s.startsWith("INSERT INTO classes"))).toHaveLength(2);
-    for (const table of ["species", "backgrounds", "feats", "weapons", "armor", "magic_items"]) {
+    for (const table of ["species", "backgrounds", "feats", "weapons", "armor", "magic_items", "rule_chapters", "rules", "items", "item_sets", "reference_entries"]) {
       const insert = statements.find((s) => s.startsWith(`INSERT INTO ${table} `));
       expect(insert).toContain("origin = 'open5e'");
       expect(insert).toContain("ON CONFLICT(id) DO UPDATE");

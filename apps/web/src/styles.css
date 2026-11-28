@@ -161,6 +161,6 @@ thead th { background: var(--tag-bg); }
 .site-footer, .source-line, .md { overflow-wrap: anywhere; }
 
 /* Equipment tabs (weapons / armor) */
-.tabs { display: flex; gap: 8px; margin: 0.5rem 0; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0.5rem 0; }
 .tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); text-decoration: none; }
 .tabs a.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }

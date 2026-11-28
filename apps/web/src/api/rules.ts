@@ -10,13 +10,23 @@ import {
   DocumentListResponse,
   FeatDetailResponse,
   FeatListResponse,
+  ItemDetailResponse,
+  ItemListResponse,
+  ItemSetDetailResponse,
+  ItemSetListResponse,
   LicenseListResponse,
   MagicItemDetailResponse,
   MagicItemListResponse,
   MonsterDetailResponse,
   MonsterListResponse,
+  ReferenceDetailResponse,
+  ReferenceListResponse,
   RollTableDetailResponse,
   RollTableListResponse,
+  RuleChapterDetailResponse,
+  RuleChapterListResponse,
+  RuleDetailResponse,
+  RuleListResponse,
   RuleSectionDetailResponse,
   RuleSectionListResponse,
   SpeciesDetailResponse,
@@ -28,7 +38,7 @@ import {
 } from "@table-forge/shared";
 import { apiGet, type QueryParams } from "./client.js";
 
-export type RuleKind = "spells" | "monsters" | "classes" | "conditions" | "species" | "backgrounds" | "feats" | "weapons" | "armor" | "magic_items" | "roll_tables" | "rule_sections";
+export type RuleKind = "spells" | "monsters" | "classes" | "conditions" | "species" | "backgrounds" | "feats" | "weapons" | "armor" | "magic_items" | "roll_tables" | "rule_sections" | "rule_chapters" | "rules" | "items" | "item_sets" | "reference_entries";
 
 export const listSpells = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/spells", SpellListResponse, p, s);
 export const getSpell = (id: string, s?: AbortSignal) =>
@@ -70,6 +80,19 @@ export const getRollTable = (id: string, s?: AbortSignal) =>
 export const listRuleSections = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/rule-sections", RuleSectionListResponse, p, s);
 export const getRuleSection = (id: string, s?: AbortSignal) =>
   apiGet(`/api/rules/rule-sections/${encodeURIComponent(id)}`, RuleSectionDetailResponse, {}, s);
+export const listRuleChapters = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/rule-chapters", RuleChapterListResponse, p, s);
+export const getRuleChapter = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/rule-chapters/${encodeURIComponent(id)}`, RuleChapterDetailResponse, {}, s);
+export const listRules = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/rules", RuleListResponse, p, s);
+export const getRule = (id: string, s?: AbortSignal) => apiGet(`/api/rules/rules/${encodeURIComponent(id)}`, RuleDetailResponse, {}, s);
+export const listItems = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/items", ItemListResponse, p, s);
+export const getItem = (id: string, s?: AbortSignal) => apiGet(`/api/rules/items/${encodeURIComponent(id)}`, ItemDetailResponse, {}, s);
+export const listItemSets = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/item-sets", ItemSetListResponse, p, s);
+export const getItemSet = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/item-sets/${encodeURIComponent(id)}`, ItemSetDetailResponse, {}, s);
+export const listReference = (p: QueryParams, s?: AbortSignal) => apiGet("/api/rules/reference", ReferenceListResponse, p, s);
+export const getReferenceEntry = (id: string, s?: AbortSignal) =>
+  apiGet(`/api/rules/reference/${encodeURIComponent(id)}`, ReferenceDetailResponse, {}, s);
 
 // Documents and licences depend on who is signed in (private books are listed for Access users only),
 // so they are fetched fresh on every use and never held in a module-level cache that could outlive a

@@ -1,5 +1,5 @@
 import { buildImportStatements, foldName, type ImportBundle } from "@table-forge/core";
-import type { Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, RollTable, RuleSection, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import type { Armor, Background, ClassDetail, Condition, Feat, Item, ItemSet, LicenseText, MagicItem, Monster, ReferenceEntry, RollTable, Rule, RuleChapter, RuleSection, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 
 export const srd: SourceDocument = {
@@ -239,6 +239,38 @@ export function ruleSection(id: string, name: string, over: Partial<RuleSection>
   return { id, documentKey: "srd-2014", dmOnly: false, name, category: "variant-rule", relatedIds: [], body: `${name} body`, ...over };
 }
 
+export function ruleChapter(id: string, name: string, over: Partial<RuleChapter> = {}): RuleChapter {
+  return { id, documentKey: "srd-2014", dmOnly: false, name, description: `${name} introduction`, ...over };
+}
+
+export function rule(id: string, name: string, over: Partial<Rule> = {}): Rule {
+  return { id, documentKey: "srd-2014", dmOnly: false, name, chapterId: "srd_test-combat", chapterName: "Test Combat", order: 1, headerLevel: 3, body: `${name} body`, ...over };
+}
+
+export function item(id: string, name: string, over: Partial<Item> = {}): Item {
+  return { id, documentKey: "srd-2014", dmOnly: false, name, category: "adventuring-gear", costGp: 1, weightLb: 2, description: `${name} description`, size: "tiny", weaponId: null, armorId: null, ...over };
+}
+
+export function itemSet(id: string, name: string, over: Partial<ItemSet> = {}): ItemSet {
+  const items = over.items ?? [];
+  return { id, documentKey: "srd-2014", dmOnly: false, name, itemCount: items.length, description: `${name} description`, items, ...over };
+}
+
+type EntryOver<K extends ReferenceEntry["kind"]> = Partial<Extract<ReferenceEntry, { kind: K }>>;
+const entryBase = (kind: string, slug: string, name: string, documentKey: string) => ({ id: `${documentKey}_${kind}_${slug}`, documentKey, dmOnly: false, name, description: `${name} description` });
+export const referenceEntries = {
+  ability: (slug: string, name: string, over: EntryOver<"ability"> = {}) =>
+    ({ ...entryBase("ability", slug, name, "srd-2014"), kind: "ability", abbreviation: "str", abilityKey: "strength", ...over }) as ReferenceEntry,
+  skill: (slug: string, name: string, over: EntryOver<"skill"> = {}) => ({ ...entryBase("skill", slug, name, "srd-2014"), kind: "skill", ability: "strength", ...over }) as ReferenceEntry,
+  size: (slug: string, name: string, over: EntryOver<"size"> = {}) =>
+    ({ ...entryBase("size", slug, name, "srd-2014"), kind: "size", rank: 4, spaceFeet: 10, hitDie: "d10", ...over }) as ReferenceEntry,
+  language: (slug: string, name: string, over: EntryOver<"language"> = {}) =>
+    ({ ...entryBase("language", slug, name, "srd-2014"), kind: "language", exotic: false, secret: false, script: null, ...over }) as ReferenceEntry,
+  damageType: (slug: string, name: string, over: EntryOver<"damage-type"> = {}) => ({ ...entryBase("damage-type", slug, name, "srd-2014"), kind: "damage-type", ...over }) as ReferenceEntry,
+  weaponProperty: (slug: string, name: string, over: EntryOver<"weapon-property"> = {}) =>
+    ({ ...entryBase("weapon-property", slug, name, "srd-2014"), kind: "weapon-property", propertyType: null, ...over }) as ReferenceEntry,
+};
+
 export const SEED = {
   documents: [srd, tob, secret],
   spells: [
@@ -315,6 +347,48 @@ export const SEED = {
     ruleSection("tob_test-fever", "Test Fever", { documentKey: "tob", category: "disease" }),
     ruleSection("secret_hidden-section", "Hidden Section", { documentKey: "secret-book", category: "lore" }),
   ],
+  ruleChapters: [
+    ruleChapter("srd_test-combat", "Test Combat"),
+    ruleChapter("srd_test-magic", "Test Magic", { description: "" }),
+    ruleChapter("tob_test-extras", "Test Extras", { documentKey: "tob" }),
+    ruleChapter("secret_hidden-chapter", "Hidden Chapter", { documentKey: "secret-book" }),
+  ],
+  // "Surprise" reads first in its chapter but sorts after "Attack" by name.
+  rules: [
+    rule("srd_test-combat_surprise", "Surprise", { order: 1, body: "Be **surprised**." }),
+    rule("srd_test-combat_attack", "Attack", { order: 2, headerLevel: 2 }),
+    rule("srd_test-magic_slots", "Spell Slots", { chapterId: "srd_test-magic", chapterName: "Test Magic" }),
+    rule("srd_test-orphan", "Orphan Rule", { chapterId: null, chapterName: null }),
+    rule("tob_test-extras_extra", "Extra Rule", { documentKey: "tob", chapterId: "tob_test-extras", chapterName: "Test Extras" }),
+    rule("secret_hidden-rule", "Hidden Rule", { documentKey: "secret-book", chapterId: "secret_hidden-chapter", chapterName: "Hidden Chapter" }),
+  ],
+  items: [
+    item("srd_test-rope", "Test Rope", { costGp: 1, weightLb: 10 }),
+    item("srd_test-lute", "Test Lute", { category: "tools", costGp: 35, weightLb: 2 }),
+    item("srd_test-longsword", "Test Longsword", { category: "weapon", costGp: 15, weightLb: 3, weaponId: "srd_longsword" }),
+    item("srd_test-chain-mail", "Test Chain Mail", { category: "armor", costGp: 75, weightLb: 55, armorId: "srd_chain-mail" }),
+    item("srd_test-shield", "Test Shield", { category: "shield", costGp: 10, weightLb: 6 }),
+    item("tob_test-gadget", "Test Gadget", { documentKey: "tob", category: "tools", costGp: 0, weightLb: null, size: null }),
+    item("secret_hidden-trinket", "Hidden Trinket", { documentKey: "secret-book" }),
+  ],
+  itemSets: [
+    itemSet("test-pack", "Test Pack", { items: [{ id: "srd_test-rope", name: "Test Rope" }, { id: "srd_test-lute", name: "Test Lute" }] }),
+    itemSet("test-focuses", "Test Focuses", { items: [] }),
+    itemSet("tob_test-set", "Test Set", { documentKey: "tob", items: [{ id: "tob_test-gadget", name: "Test Gadget" }] }),
+    itemSet("secret_hidden-pack", "Hidden Pack", { documentKey: "secret-book" }),
+  ],
+  referenceEntries: [
+    referenceEntries.ability("str", "Strength"),
+    referenceEntries.skill("athletics", "Athletics"),
+    referenceEntries.size("large", "Large"),
+    referenceEntries.size("tiny", "Tiny", { rank: 1, spaceFeet: 2.5, hitDie: "d4" }),
+    referenceEntries.language("abyssal", "Abyssal", { exotic: true, script: "infernal" }),
+    referenceEntries.language("common", "Common"),
+    referenceEntries.damageType("acid", "Acid"),
+    referenceEntries.weaponProperty("finesse-wp", "Finesse"),
+    { ...referenceEntries.language("void-speech", "Void Speech"), documentKey: "tob", id: "tob_language_void-speech" } as ReferenceEntry,
+    { ...referenceEntries.damageType("hidden", "Hidden Damage"), documentKey: "secret-book", id: "secret-book_damage-type_hidden" } as ReferenceEntry,
+  ],
 };
 
 export const LICENSES: LicenseText[] = [
@@ -337,6 +411,11 @@ export const openBundle = (run: string, over: Partial<ImportBundle> = {}): strin
       weapons: SEED.weapons.filter((x) => x.documentKey !== "secret-book"),
       armor: SEED.armor.filter((x) => x.documentKey !== "secret-book"),
       magicItems: SEED.magicItems.filter((x) => x.documentKey !== "secret-book"),
+      ruleChapters: SEED.ruleChapters.filter((x) => x.documentKey !== "secret-book"),
+      rules: SEED.rules.filter((x) => x.documentKey !== "secret-book"),
+      items: SEED.items.filter((x) => x.documentKey !== "secret-book"),
+      itemSets: SEED.itemSets.filter((x) => x.documentKey !== "secret-book"),
+      referenceEntries: SEED.referenceEntries.filter((x) => x.documentKey !== "secret-book"),
       ...over,
     },
     run,
@@ -348,7 +427,7 @@ export async function runStatements(statements: string[]): Promise<void> {
 
 /** Removes everything, then loads the Open5e seed (via the real import SQL) and a private document's rows. */
 export async function seedRules(): Promise<void> {
-  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
+  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections", "rule_chapters", "rules", "items", "item_sets", "reference_entries", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
   const j = (v: unknown) => JSON.stringify(v);
   const priv = [
     env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
@@ -419,6 +498,29 @@ export async function seedRules(): Promise<void> {
     ...SEED.ruleSections
       .filter((x) => x.documentKey === "secret-book")
       .map((x) => ruleSectionInsert(x, null)),
+    ...SEED.ruleChapters
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) => env.DB.prepare("INSERT INTO rule_chapters (id, document_key, name, name_search, data) VALUES (?, ?, ?, ?, ?)").bind(x.id, x.documentKey, x.name, foldName(x.name), j(x))),
+    ...SEED.rules
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO rules (id, document_key, chapter_id, chapter_name, name, name_search, sort_index, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(
+          x.id, x.documentKey, x.chapterId, x.chapterName, x.name, foldName(x.name), x.order, j(x),
+        ),
+      ),
+    ...SEED.items
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) =>
+        env.DB.prepare("INSERT INTO items (id, document_key, name, name_search, category, cost_gp, weight_lb, weapon_id, armor_id, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
+          x.id, x.documentKey, x.name, foldName(x.name), x.category, x.costGp, x.weightLb, x.weaponId, x.armorId, j(x),
+        ),
+      ),
+    ...SEED.itemSets
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) => env.DB.prepare("INSERT INTO item_sets (id, document_key, name, name_search, item_count, data) VALUES (?, ?, ?, ?, ?, ?)").bind(x.id, x.documentKey, x.name, foldName(x.name), x.itemCount, j(x))),
+    ...SEED.referenceEntries
+      .filter((x) => x.documentKey === "secret-book")
+      .map((x) => env.DB.prepare("INSERT INTO reference_entries (id, kind, document_key, name, name_search, data) VALUES (?, ?, ?, ?, ?, ?)").bind(x.id, x.kind, x.documentKey, x.name, foldName(x.name), j(x))),
   ];
   await env.DB.batch([...clear.map((s) => env.DB.prepare(s)), ...priv]);
   // Open5e rows go in afterwards: the document guard needs the documents to exist, and the

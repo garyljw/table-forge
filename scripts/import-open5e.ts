@@ -38,13 +38,24 @@ import {
   countStampedStatement,
   documentStatement,
   featStatement,
+  documentKeyOf,
+  itemSetStatement,
+  itemStatement,
   isDocumentIncluded,
   isStatementTooLarge,
   licenseStatement,
   magicItemStatement,
   monsterStatement,
+  referenceEntryStatement,
+  ruleChapterStatement,
+  ruleStatement,
+  normaliseItem,
+  normaliseItemSet,
   normaliseLicense,
   normaliseMagicItem,
+  normaliseReference,
+  normaliseRule,
+  normaliseRuleChapter,
   speciesStatement,
   spellStatement,
   staleRowStatements,
@@ -71,12 +82,17 @@ import {
   type RawDocument,
   type RawFeat,
   type RawLicense,
+  type RawItem,
+  type RawItemSet,
   type RawMagicItem,
+  type RawReference,
+  type RawRule,
+  type RawRuleset,
   type RawSpecies,
   type RawSpell,
   type RawWeapon,
 } from "@table-forge/core";
-import { RULE_TABLES, type RuleTable, Armor, Background, ClassDetail, Condition, Feat, LicenseText, MagicItem, Monster, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
+import { RULE_TABLES, type ReferenceKind, type RuleTable, Armor, Background, ClassDetail, Condition, Feat, Item, ItemSet, LicenseText, MagicItem, Monster, ReferenceEntry, Rule, RuleChapter, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workerDir = path.join(root, "apps/worker");
@@ -105,6 +121,22 @@ const force = args.has("--force");
 for (const a of args) if (!["--remote", "--no-apply", "--force", "--confirm-production"].includes(a)) throw new Error(`unknown argument ${a}`);
 
 const PAGE_LIMIT = 200;
+
+/** Open5e's reference-list endpoints and the kind of entry each becomes. */
+const REFERENCE_ENDPOINTS: [endpoint: string, kind: ReferenceKind][] = [
+  ["abilities", "ability"],
+  ["skills", "skill"],
+  ["creaturetypes", "creature-type"],
+  ["damagetypes", "damage-type"],
+  ["alignments", "alignment"],
+  ["spellschools", "spell-school"],
+  ["sizes", "size"],
+  ["itemrarities", "item-rarity"],
+  ["itemcategories", "item-category"],
+  ["languages", "language"],
+  ["environments", "environment"],
+  ["weaponproperties", "weapon-property"],
+];
 const apiOrigin = new URL(OPEN5E_API_BASE).origin;
 
 const MAX_ATTEMPTS = 4;
@@ -231,21 +263,9 @@ async function main(): Promise<void> {
   for (const d of excluded) console.log(`  - ${d.key.padEnd(24)} ${d.gamesystem.key.padEnd(8)} ${d.name}`);
   const includedKeys = new Set(included.map((d) => d.key));
 
-  const stats = {
-    spells: newStats(),
-    monsters: newStats(),
-    classes: newStats(),
-    conditions: newStats(),
-    species: newStats(),
-    backgrounds: newStats(),
-    feats: newStats(),
-    weapons: newStats(),
-    armor: newStats(),
-    magic_items: newStats(),
-    // Open5e has no roll tables: these stay empty and exist so the guard sees every table.
-    roll_tables: newStats(),
-    rule_sections: newStats(),
-  };
+  // One entry per rules table, so the guard sees every table. Open5e has no roll tables or rule sections
+  // (those come from private books and homebrew), so those two stay empty.
+  const stats = Object.fromEntries(RULE_TABLES.map((t) => [t, newStats()])) as Record<RuleTable, Stats>;
   console.log("");
 
   const rawSpells: RawSpell[] = [];
@@ -262,7 +282,8 @@ async function main(): Promise<void> {
   const rawConditions = await fetchAll<RawCondition>("conditions");
   // The character option endpoints are fetched whole, then kept by document: Open5e ignores the
   // document filters on some of them (weapons returns the 2024 rules alongside the 2014 ones).
-  const ofIncluded = <T extends { document: { key: string } }>(all: T[]): T[] => all.filter((r) => includedKeys.has(r.document.key));
+  // Some endpoints name the document with an object and some with the bare key; `documentKeyOf` reads both.
+  const ofIncluded = <T extends { document: string | { key: string } }>(all: T[]): T[] => all.filter((r) => includedKeys.has(documentKeyOf(r.document) ?? ""));
   const rawSpecies = ofIncluded(await fetchAll<RawSpecies>("species"));
   const rawBackgrounds = ofIncluded(await fetchAll<RawBackground>("backgrounds"));
   const rawFeats = ofIncluded(await fetchAll<RawFeat>("feats"));
@@ -271,6 +292,20 @@ async function main(): Promise<void> {
   // `/magicitems/` ignores the document filter and returns every game system, so fetch it whole and keep
   // the included documents (the 2024 SRD's magic items drop out here, by the same rules as everything else).
   const rawMagicItems = ofIncluded(await fetchAll<RawMagicItem>("magicitems"));
+  // Rules text, equipment and the reference lists. `/rules/`, `/rulesets/` and `/items/` also return the 2024 rules,
+  // whatever filter is passed, so these too are fetched whole and kept by document.
+  const rawRulesets = ofIncluded(await fetchAll<RawRuleset>("rulesets"));
+  const rawRules = ofIncluded(await fetchAll<RawRule>("rules"));
+  const rawItems = ofIncluded(await fetchAll<RawItem>("items"));
+  const rawItemSets = ofIncluded(await fetchAll<RawItemSet>("itemsets"));
+  // The reference lists keep their text per document (abilities, skills, ...) or have a single owner. An item
+  // rarity has no document at all, so it is kept as it is and the normaliser gives it to the core document.
+  const rawReferences: { key: string; kind: ReferenceKind; raw: RawReference }[] = [];
+  for (const [endpoint, kind] of REFERENCE_ENDPOINTS) {
+    const all = await fetchAll<RawReference>(endpoint);
+    const kept = kind === "item-rarity" ? all : all.filter((r) => includedKeys.has(documentKeyOf(r.document) ?? ""));
+    for (const raw of kept) rawReferences.push({ key: `${kind}:${raw.key}`, kind, raw });
+  }
 
   const spells = convert("spells", rawSpells, stats.spells, (r) => [normaliseSpell(r)], Spell, (r) => spellStatement(r, run), includedKeys);
   const monsters = convert("monsters", rawCreatures, stats.monsters, (r) => [normaliseMonster(r)], Monster, (r) => monsterStatement(r, run), includedKeys);
@@ -348,6 +383,32 @@ async function main(): Promise<void> {
   const armor = convert("armor", rawArmor, stats.armor, (r) => [normaliseArmor(r)], Armor, (r) => armorStatement(r, run), includedKeys);
   const magicItems = convert("magic items", rawMagicItems, stats.magic_items, (r) => [normaliseMagicItem(r)], MagicItem, (r) => magicItemStatement(r, run), includedKeys);
 
+  const ruleChapters = convert("rule chapters", rawRulesets, stats.rule_chapters, (r) => [normaliseRuleChapter(r)], RuleChapter, (r) => ruleChapterStatement(r, run), includedKeys);
+  const chapterNames = new Map(ruleChapters.map((c) => [c.record.id, c.record.name]));
+  const rules = convert("rules", rawRules, stats.rules, (r) => [normaliseRule(r, chapterNames)], Rule, (r) => ruleStatement(r, run), includedKeys);
+  const items = convert("items", rawItems, stats.items, (r) => [normaliseItem(r)], Item, (r) => itemStatement(r, run), includedKeys);
+  const itemIds = new Set(items.map((i) => i.record.id));
+  const itemSets = convert("item sets", rawItemSets, stats.item_sets, (r) => [normaliseItemSet(r, (id) => itemIds.has(id))], ItemSet, (r) => itemSetStatement(r, run), includedKeys);
+  const referenceEntries = convert(
+    "reference entries",
+    rawReferences,
+    stats.reference_entries,
+    (r) => normaliseReference(r.kind, r.raw, (key) => includedKeys.has(key)),
+    ReferenceEntry,
+    (r) => referenceEntryStatement(r, run),
+    includedKeys,
+  );
+  const perKind = new Map<string, number>();
+  for (const e of referenceEntries) perKind.set(e.record.kind, (perKind.get(e.record.kind) ?? 0) + 1);
+  console.log(`  by kind: ${[...perKind].map(([k, n]) => `${k} ${n}`).join(", ")}`);
+  // Items link to weapon and armour records by id; count any that point at a record we did not store.
+  const weaponIds = new Set(weapons.map((w) => w.record.id));
+  const armorIds = new Set(armor.map((x) => x.record.id));
+  const withWeapon = items.filter((i) => i.record.weaponId !== null);
+  const withArmor = items.filter((i) => i.record.armorId !== null);
+  const dangling = withWeapon.filter((i) => !weaponIds.has(i.record.weaponId ?? "")).length + withArmor.filter((i) => !armorIds.has(i.record.armorId ?? "")).length;
+  console.log(`Item links: ${withWeapon.length} to weapons, ${withArmor.length} to armour, ${dangling} pointing at a record that is not stored`);
+
   const whereArgs = remote ? ["--remote", "--config", targetConfig] : ["--local"];
   const where = remote ? `REMOTE ${target}` : "local";
   /** Runs one SELECT with `wrangler d1 execute --json` and returns its first row. Throws if the output is not as expected. */
@@ -394,7 +455,7 @@ async function main(): Promise<void> {
   }
 
   // Only documents that actually supply a record are stored (and credited).
-  const used = new Set([...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor, ...magicItems].map((c) => c.record.documentKey));
+  const used = new Set([...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor, ...magicItems, ...ruleChapters, ...rules, ...items, ...itemSets, ...referenceEntries].map((c) => c.record.documentKey));
   const documents = included
     .filter((d) => used.has(d.key))
     .map((d) => {
@@ -415,7 +476,7 @@ async function main(): Promise<void> {
   const statements = [
     ...documents.map((d) => d.statement),
     ...licenses.map((l) => l.statement),
-    ...[...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor, ...magicItems].map((c) => c.statement),
+    ...[...spells, ...monsters, ...classes, ...conditions, ...species, ...backgrounds, ...feats, ...weapons, ...armor, ...magicItems, ...ruleChapters, ...rules, ...items, ...itemSets, ...referenceEntries].map((c) => c.statement),
     ...staleRowStatements(run),
   ];
   mkdirSync(outDir, { recursive: true });
@@ -423,10 +484,10 @@ async function main(): Promise<void> {
   writeFileSync(sqlFile, statements.join("\n") + "\n");
   console.log(`\nWrote ${statements.length} statements to ${path.relative(root, sqlFile)} (run ${run})`);
 
-  console.log("\nCounts per document (spells / monsters / classes / conditions / species / backgrounds / feats / weapons / armor / magic items):");
+  console.log("\nCounts per document (spells / monsters / classes / conditions / species / backgrounds / feats / weapons / armor / magic items / rule chapters / rules / items / item sets / reference entries):");
   for (const d of documents) {
     const n = (s: Stats) => s.byDocument.get(d.record.key) ?? 0;
-    const row = [stats.spells, stats.monsters, stats.classes, stats.conditions, stats.species, stats.backgrounds, stats.feats, stats.weapons, stats.armor, stats.magic_items].map(n);
+    const row = [stats.spells, stats.monsters, stats.classes, stats.conditions, stats.species, stats.backgrounds, stats.feats, stats.weapons, stats.armor, stats.magic_items, stats.rule_chapters, stats.rules, stats.items, stats.item_sets, stats.reference_entries].map(n);
     console.log(`  ${d.record.key.padEnd(24)} ${row.join(" / ")}`);
   }
   console.log("\nValidation failures:");
@@ -449,6 +510,11 @@ async function main(): Promise<void> {
     weapons: weapons.length,
     armor: armor.length,
     magic_items: magicItems.length,
+    rule_chapters: ruleChapters.length,
+    rules: rules.length,
+    items: items.length,
+    item_sets: itemSets.length,
+    reference_entries: referenceEntries.length,
   };
   let skipped = 0;
   for (const [table, want] of Object.entries(expected)) {

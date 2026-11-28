@@ -92,3 +92,16 @@ export function magicItemSubtitle(m: {
   const attune = m.requiresAttunement ? ` (requires attunement${m.attunementDetail ? ` ${m.attunementDetail}` : ""})` : "";
   return `${titleKey(m.type)}${base}, ${rarityLabel(m.rarity)}${attune}`;
 }
+
+/** A price given in gold pieces: 0.05 is "5 cp", 0.5 is "5 sp", 25 is "25 gp". A price of nothing is a dash. */
+export function costLabel(gp: number): string {
+  const cp = Math.round(gp * 100);
+  if (cp <= 0) return "\u2014";
+  if (cp >= 100) return `${cp / 100} gp`;
+  return cp % 10 === 0 ? `${cp / 10} sp` : `${cp} cp`;
+}
+
+/** Weight in pounds, or a dash when the source gives none. */
+export function weightLabel(lb: number | null): string {
+  return lb === null ? "\u2014" : `${lb} lb.`;
+}

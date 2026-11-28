@@ -1,7 +1,7 @@
 import { staleRowStatements } from "@table-forge/core";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { magicItem, monster, openBundle, runStatements, SEED, seedRules, species, spell } from "./seed.js";
+import { magicItem, monster, openBundle, rule, runStatements, SEED, seedRules, species, spell } from "./seed.js";
 
 const ids = async (table: string): Promise<string[]> =>
   ((await env.DB.prepare(`SELECT id FROM ${table} ORDER BY id`).all()).results as { id: string }[]).map((r) => r.id);
@@ -34,7 +34,7 @@ describe("Open5e import SQL", () => {
   });
 
   it("never touches rows of private documents", async () => {
-    await runStatements(openBundle("run-2", { spells: [], monsters: [], classes: [], conditions: [], species: [], backgrounds: [], feats: [], weapons: [], armor: [], magicItems: [] }));
+    await runStatements(openBundle("run-2", { spells: [], monsters: [], classes: [], conditions: [], species: [], backgrounds: [], feats: [], weapons: [], armor: [], magicItems: [], ruleChapters: [], rules: [], items: [], itemSets: [], referenceEntries: [] }));
     expect(await ids("spells")).toEqual(["secret_hidden-spell"]);
     expect(await ids("monsters")).toEqual(["secret_hidden-beast"]);
     expect(await ids("classes")).toEqual(["secret_hidden-subclass"]);
@@ -44,6 +44,11 @@ describe("Open5e import SQL", () => {
     expect(await ids("weapons")).toEqual(["secret_hidden-blade"]);
     expect(await ids("armor")).toEqual(["secret_hidden-plate"]);
     expect(await ids("magic_items")).toEqual(["secret_hidden-idol"]);
+    expect(await ids("rule_chapters")).toEqual(["secret_hidden-chapter"]);
+    expect(await ids("rules")).toEqual(["secret_hidden-rule"]);
+    expect(await ids("items")).toEqual(["secret_hidden-trinket"]);
+    expect(await ids("item_sets")).toEqual(["secret_hidden-pack"]);
+    expect(await ids("reference_entries")).toEqual(["secret-book_damage-type_hidden"]);
   });
 
   it("is idempotent for the character option tables, and removes vanished rows", async () => {
@@ -64,6 +69,35 @@ describe("Open5e import SQL", () => {
     expect(await ids("magic_items")).toEqual(["secret_hidden-idol", "srd_test-ring"]);
     await runStatements(openBundle("run-4", { magicItems: [magicItem("secret_hidden-idol", "Overwritten", { documentKey: "srd-2014" })] }));
     expect((await env.DB.prepare("SELECT name FROM magic_items WHERE id = 'secret_hidden-idol'").first<{ name: string }>())?.name).toBe("Hidden Idol");
+  });
+
+  it("is idempotent for rules text, equipment and reference entries, and removes vanished rows", async () => {
+    const tables = ["rule_chapters", "rules", "items", "item_sets", "reference_entries"];
+    const snapshot = async () => Object.fromEntries(await Promise.all(tables.map(async (t) => [t, await ids(t)])));
+    const before = await snapshot();
+    await runStatements(openBundle("run-2"));
+    await runStatements(openBundle("run-3"));
+    expect(await snapshot()).toEqual(before);
+    await runStatements(
+      openBundle("run-4", {
+        ruleChapters: SEED.ruleChapters.filter((x) => x.id === "srd_test-combat"),
+        rules: SEED.rules.filter((x) => x.id === "srd_test-combat_attack"),
+        items: [],
+        itemSets: SEED.itemSets.filter((x) => x.id === "test-pack"),
+        referenceEntries: SEED.referenceEntries.filter((x) => x.kind === "size" && x.documentKey === "srd-2014"),
+      }),
+    );
+    expect(await ids("rule_chapters")).toEqual(["secret_hidden-chapter", "srd_test-combat"]);
+    expect(await ids("rules")).toEqual(["secret_hidden-rule", "srd_test-combat_attack"]);
+    expect(await ids("items")).toEqual(["secret_hidden-trinket"]);
+    expect(await ids("item_sets")).toEqual(["secret_hidden-pack", "test-pack"]);
+    expect(await ids("reference_entries")).toEqual(["secret-book_damage-type_hidden", "srd-2014_size_large", "srd-2014_size_tiny"]);
+  });
+
+  it("skips a rule whose id belongs to a private row, instead of overwriting it", async () => {
+    await runStatements(openBundle("run-2", { rules: [rule("secret_hidden-rule", "Overwritten")] }));
+    const row = await env.DB.prepare("SELECT name, document_key, import_run FROM rules WHERE id = 'secret_hidden-rule'").first<Record<string, string | null>>();
+    expect(row).toEqual({ name: "Hidden Rule", document_key: "secret-book", import_run: null });
   });
 
   it("skips a species whose id belongs to a private row", async () => {
