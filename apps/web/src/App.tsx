@@ -1,5 +1,8 @@
 import { useEffect } from "react";
 import { Link, Route, Switch, useLocation, useSearch } from "wouter";
+import { getMe } from "./api/admin.js";
+import { useApi } from "./hooks/useApi.js";
+import { AdminBooksPage } from "./pages/AdminBooksPage.js";
 import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { BackgroundsPage } from "./pages/BackgroundsPage.js";
 import { ClassesPage } from "./pages/ClassesPage.js";
@@ -104,6 +107,9 @@ function Footer() {
 export function App() {
   const [location] = useLocation();
   const search = useSearch();
+  // Asked once on load. It also records that this person has signed in. The link is cosmetic: the server checks admin on every request.
+  const me = useApi((signal) => getMe(signal), "me");
+  const isAdmin = me.status === "ok" && me.data.isAdmin;
   return (
     <div className="app">
       <header className="site-header">
@@ -114,6 +120,7 @@ export function App() {
           {NAV.map((n) => (
             <NavLink key={n.href} {...n} />
           ))}
+          {isAdmin && <NavLink href="/admin/books" label="Book owners" />}
         </nav>
       </header>
       <main>
@@ -149,6 +156,7 @@ export function App() {
             <Route path="/rules/:id">{(p: { id: string }) => <RuleSectionDetailPage id={p.id} />}</Route>
             <Route path="/conditions" component={ConditionsPage} />
             <Route path="/credits" component={CreditsPage} />
+            <Route path="/admin/books" component={AdminBooksPage} />
             <Route component={NotFound} />
           </Switch>
         </ErrorBoundary>

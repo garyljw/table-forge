@@ -2,8 +2,8 @@ import { foldName } from "@table-forge/core";
 import { env } from "cloudflare:workers";
 import { DocumentListResponse, LicenseListResponse } from "@table-forge/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { DISPLAY, EMAIL_BUT_NOT_USER, getAs, NO_IDENTITY, SERVICE_TOKEN, USER, type TestCaller } from "./identities.js";
-import { secret, SEED, seedRules } from "./seed.js";
+import { DISPLAY, EMAIL_BUT_NOT_USER, getAs, NO_IDENTITY, OTHER_USER, SERVICE_TOKEN, USER, type TestCaller } from "./identities.js";
+import { addOtherBook, own, secret, SEED, seedRules } from "./seed.js";
 
 // The seed's private document ("secret-book") holds INVENTED rows, never real book text.
 const PRIVATE_MARKERS = ["Hidden", "secret_", "secret-book", "Secret Book", "PRIVATE"];
@@ -13,6 +13,8 @@ const DENIED: [string, TestCaller][] = [
   ["a service token", SERVICE_TOKEN],
   ["a Display identity", DISPLAY],
   ["an email on a non-user kind", EMAIL_BUT_NOT_USER],
+  // Signed in, but nobody has ticked any book for them: public content only.
+  ["a signed-in user who owns no book", OTHER_USER],
 ];
 
 beforeEach(async () => {
@@ -45,7 +47,11 @@ const TABLES = [
   { path: "reference", name: "Hidden Damage", id: "secret-book_damage-type_hidden" },
 ];
 
-describe("a verified Access user", () => {
+describe("an owner of the private book", () => {
+  beforeEach(async () => {
+    await own(USER.email, "secret-book");
+  });
+
   it.each(TABLES)("sees private $path in the list, in search, in the document filter and in detail", async ({ path, name, id }) => {
     expect(await names(USER, `/${path}`)).toContain(name);
     expect(await names(USER, `/${path}?q=hidden`)).toContain(name);
@@ -85,6 +91,11 @@ describe("a verified Access user", () => {
 });
 
 describe("the core rules filter", () => {
+  // The owner of both private books used below.
+  beforeEach(async () => {
+    await own(USER.email, "secret-book", "phb-2014");
+  });
+
   // A private "phb-2014" document with one invented spell, standing in for an owner's book.
   beforeEach(async () => {
     const doc = { ...secret, key: "phb-2014", name: "Test PHB", displayName: "Test PHB" };
@@ -189,16 +200,74 @@ describe.each(DENIED)("%s", (_label, caller) => {
 });
 
 describe("through the real Worker and Access middleware", () => {
-  it("serves private records to a validly signed-in user, and nothing without a token", async () => {
+  it("serves private records to a validly signed-in owner, and nothing without a token", async () => {
+    await own("player@example.com", "secret-book");
     const { exports } = await import("cloudflare:workers");
     const { authedFetch } = await import("./auth.js");
     expect((await authedFetch("https://example.com/api/rules/spells/secret_hidden-spell")).status).toBe(200);
     expect((await exports.default.fetch(new Request("https://example.com/api/rules/spells/secret_hidden-spell"))).status).toBe(401);
   });
 
+  it("gives a validly signed-in user who owns no book a 404 for a private record", async () => {
+    const { authedFetch, signToken } = await import("./auth.js");
+    const res = await authedFetch("https://example.com/api/rules/spells/secret_hidden-spell", {}, await signToken({ email: "stranger@example.com" }));
+    expect(res.status).toBe(404);
+  });
+
+  it("matches a tick to the Access email whatever its case", async () => {
+    await own("gary@x.com", "secret-book");
+    const { authedFetch, signToken } = await import("./auth.js");
+    const res = await authedFetch("https://example.com/api/rules/spells/secret_hidden-spell", {}, await signToken({ email: "Gary@X.com" }));
+    expect(res.status).toBe(200);
+  });
+
   it("rejects a service-token style JWT (no email) before any rules route runs", async () => {
     const { authedFetch, signToken } = await import("./auth.js");
     const res = await authedFetch("https://example.com/api/rules/spells/secret_hidden-spell", {}, await signToken({ email: null }));
     expect(res.status).toBe(401);
+  });
+});
+
+describe("an owner of one private book but not another", () => {
+  const OTHER_SPELL = "other_spell";
+  beforeEach(async () => {
+    await addOtherBook();
+    await own(USER.email, "secret-book");
+  });
+
+  it("sees the owned book in list, search, filter and detail, and not the other in any of them", async () => {
+    expect(await names(USER, "/spells")).toContain("Hidden Fire Spell");
+    expect(await names(USER, "/spells")).not.toContain("Other Book Spell");
+    expect(await names(USER, "/spells?q=other")).toEqual([]);
+    expect(await names(USER, "/spells?document=other-book")).toEqual([]);
+    expect((await getAs(USER, `/spells/${OTHER_SPELL}`)).status).toBe(404);
+    expect((await getAs(USER, "/spells/secret_hidden-spell")).status).toBe(200);
+    expect(((await (await getAs(USER, "/spells")).json()) as { total: number }).total).toBe(7);
+  });
+
+  it("lists and counts only the owned book's document", async () => {
+    const docs = DocumentListResponse.parse(await (await getAs(USER, "/documents")).json());
+    expect(docs.items.map((d) => d.key)).toContain("secret-book");
+    expect(docs.items.map((d) => d.key)).not.toContain("other-book");
+    expect(JSON.stringify(await (await getAs(USER, "/licenses")).json())).not.toContain("Other Book");
+  });
+
+  it("sees the other book once it is ticked, and not before", async () => {
+    await own(USER.email, "other-book");
+    expect(await names(USER, "/spells")).toContain("Other Book Spell");
+    expect((await getAs(USER, `/spells/${OTHER_SPELL}`)).status).toBe(200);
+  });
+
+  it("gives a non-owner of both neither", async () => {
+    for (const p of ["/spells", "/spells?q=book", "/spells?document=other-book", "/spells?document=secret-book"]) {
+      const got = await names(OTHER_USER, p);
+      expect(got).not.toContain("Other Book Spell");
+      expect(got).not.toContain("Hidden Fire Spell");
+    }
+    expect((await getAs(OTHER_USER, `/spells/${OTHER_SPELL}`)).status).toBe(404);
+  });
+
+  it("never lets the document filter reach an unowned book via a quoted or odd value", async () => {
+    expect((await getAs(USER, "/spells?document=other-book%27%20OR%201%3D1")).status).toBe(400);
   });
 });

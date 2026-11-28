@@ -10,18 +10,55 @@ import { CORE_RULES_DOCUMENT_KEYS, RULE_TABLES, type RuleTable } from "@table-fo
 /**
  * Which documents a request may read. Built only by `documentScopeFor` (permissions.ts), from the
  * caller's identity, so a route cannot widen it by accident. Every query in this file takes one.
+ *
+ * `email` is the caller's normalised email when they are a verified user, else null (public documents only).
+ * Which private books that email owns is decided in SQL, by `visibilityClause`.
  */
 export interface DocumentScope {
-  readonly includePrivate: boolean;
+  readonly email: string | null;
+}
+
+/** A fragment of SQL with its bound values, in placeholder order. The text is fixed; request-derived values are only ever in `params`. */
+export interface Clause {
+  readonly sql: string;
+  readonly params: readonly string[];
 }
 
 /**
- * THE one place the document visibility rule is written as SQL. `d` is the `documents` table.
- * Public documents are always readable; private ones (the owner's transcribed books) only when
- * the scope says so. Both fragments are fixed text: nothing from the request reaches them.
+ * THE one place the document visibility rule is written as SQL. `alias` is the `documents` table alias
+ * (default `d`). Public documents are always readable; a private document (the owner's transcribed book)
+ * only when `book_owners` has a row for its key and the caller's email. The email is a bound parameter.
+ * With no email (not a verified user) the result is exactly the public-only rule.
  */
-export function visibilityClause(scope: DocumentScope): string {
-  return scope.includePrivate ? "d.visibility IN ('public', 'private')" : "d.visibility = 'public'";
+export function visibilityClause(scope: DocumentScope, alias = "d"): Clause {
+  if (scope.email === null) return { sql: `${alias}.visibility = 'public'`, params: [] };
+  return {
+    sql: `(${alias}.visibility = 'public' OR (${alias}.visibility = 'private' AND EXISTS (SELECT 1 FROM book_owners o WHERE o.document_key = ${alias}.key AND o.email = ?)))`,
+    params: [scope.email],
+  };
+}
+
+/**
+ * THE one place the SRD masking rule is written as SQL. A record `t` of `table` is hidden when another
+ * record (never `t` itself) in the same table, whose document is visible to `scope`, has `supersedes_id = t.id` (a book
+ * record that replaces it). It uses `visibilityClause`, so a record superseded only by a book the caller
+ * cannot read stays visible. `table` is one of the fixed `RuleTable` names written in this codebase.
+ */
+export function maskingClause(scope: DocumentScope, table: RuleTable): Clause {
+  const vis = visibilityClause(scope, "sd");
+  return {
+    sql: `NOT EXISTS (SELECT 1 FROM ${table} s JOIN documents sd ON sd.key = s.document_key WHERE s.supersedes_id = t.id AND s.id <> t.id AND ${vis.sql})`,
+    params: vis.params,
+  };
+}
+
+/** A select-list expression: the id of a visible record replacing `t`, or NULL. Same rule as `maskingClause`, so an id is only ever reported to a caller who may read it. */
+function supersededByExpr(scope: DocumentScope, table: RuleTable): Clause {
+  const vis = visibilityClause(scope, "sd");
+  return {
+    sql: `(SELECT s.id FROM ${table} s JOIN documents sd ON sd.key = s.document_key WHERE s.supersedes_id = t.id AND s.id <> t.id AND ${vis.sql} ORDER BY s.id LIMIT 1)`,
+    params: vis.params,
+  };
 }
 
 /**
@@ -31,10 +68,12 @@ export function visibilityClause(scope: DocumentScope): string {
  */
 export class Where {
   private readonly clauses: string[];
-  constructor(scope: DocumentScope) {
-    this.clauses = [visibilityClause(scope)];
+  readonly params: (string | number)[];
+  constructor(readonly scope: DocumentScope) {
+    const vis = visibilityClause(scope);
+    this.clauses = [vis.sql];
+    this.params = [...vis.params];
   }
-  readonly params: (string | number)[] = [];
 
   add(clause: string, ...values: (string | number)[]): this {
     this.clauses.push(clause);
@@ -104,12 +143,14 @@ export async function selectPage<Row>(
 ): Promise<Page<Row>> {
   const orderBy = PAGE_ORDERS[order];
   if (orderBy === undefined) throw new Error(`unknown page order "${String(order)}"`);
-  const from = `FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE ${where.sql}`;
+  const mask = maskingClause(where.scope, table);
+  const from = `FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE ${where.sql} AND ${mask.sql}`;
+  const params = [...where.params, ...mask.params];
   const [count, rows] = await db.batch([
-    db.prepare(`SELECT COUNT(*) AS n ${from}`).bind(...where.params),
+    db.prepare(`SELECT COUNT(*) AS n ${from}`).bind(...params),
     db
       .prepare(`SELECT ${columns} ${from} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
-      .bind(...where.params, pageSize, (page - 1) * pageSize),
+      .bind(...params, pageSize, (page - 1) * pageSize),
   ]);
   return { rows: (rows?.results ?? []) as Row[], total: Number((count?.results[0] as { n: number } | undefined)?.n ?? 0) };
 }
@@ -118,48 +159,73 @@ export function pageEnvelope<T>(items: T[], total: number, page: number, pageSiz
   return { items, page, pageSize, total, totalPages: Math.ceil(total / pageSize) };
 }
 
-/** A record's JSON and its document's JSON, or null when the id is unknown or its document is not visible to `scope`. */
+/**
+ * A record's JSON and its document's JSON, or null when the id is unknown or its document is not visible to `scope`.
+ * A record that a readable book record replaces is still returned (an old link keeps working), with
+ * `supersededBy` set to the replacing record's id so the web app can redirect. `supersededBy` comes from the
+ * masking rule, so it is never set for a book the caller cannot read.
+ */
+// Detail is intentionally NOT masked: old SRD links keep working, the client follows `supersededBy`, and SRD content is public anyway.
 export async function selectDetail(
   db: D1Database,
   scope: DocumentScope,
   table: RuleTable,
   id: string,
-): Promise<{ data: unknown; document: unknown } | null> {
+): Promise<{ data: unknown; document: unknown; supersededBy?: string } | null> {
+  const by = supersededByExpr(scope, table);
+  const vis = visibilityClause(scope);
   const row = await db
     .prepare(
-      `SELECT t.data AS data, d.data AS document FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE t.id = ? AND ${visibilityClause(scope)}`,
+      `SELECT t.data AS data, d.data AS document, ${by.sql} AS superseded_by FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE t.id = ? AND ${vis.sql}`,
     )
-    .bind(id)
-    .first<{ data: string; document: string }>();
-  return row ? { data: JSON.parse(row.data), document: JSON.parse(row.document) } : null;
+    .bind(...by.params, id, ...vis.params)
+    .first<{ data: string; document: string; superseded_by: string | null }>();
+  if (!row) return null;
+  const found = { data: JSON.parse(row.data), document: JSON.parse(row.document) };
+  return row.superseded_by === null ? found : { ...found, supersededBy: row.superseded_by };
 }
 
 export type ChildTable = "classes" | "species" | "rules";
 
-/** Fixed query text per table: the table name is never taken from the caller. `columns` is written in this codebase. */
-const CHILD_QUERIES: Record<ChildTable, (columns: string, scope: DocumentScope) => string> = {
-  classes: (columns, scope) =>
-    `SELECT ${columns} FROM classes t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
-  species: (columns, scope) =>
-    `SELECT ${columns} FROM species t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.parent_id = ? ORDER BY t.name COLLATE NOCASE, t.id`,
+/** Fixed filter, order and parent table per child table: the table name is never taken from the caller. */
+const CHILD_QUERIES: Record<ChildTable, { column: string; parentTable: RuleTable; order: string }> = {
+  classes: { column: "t.parent_id", parentTable: "classes", order: "t.name COLLATE NOCASE, t.id" },
+  species: { column: "t.parent_id", parentTable: "species", order: "t.name COLLATE NOCASE, t.id" },
   // The "parent" of a rule is its chapter, and a chapter's rules read in order, not by name.
-  rules: (columns, scope) =>
-    `SELECT ${columns} FROM rules t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} AND t.chapter_id = ? ORDER BY t.sort_index, t.id`,
+  rules: { column: "t.chapter_id", parentTable: "rule_chapters", order: "t.sort_index, t.id" },
 };
 
-/** Every record visible to `scope` of `table` whose parent is `parentId`, with no paging (a class, species or rules chapter has a few dozen children). */
+/**
+ * Every record visible to `scope` (visibility and masking both applied to each child) of `table` whose parent is
+ * `parentId`, with no paging (a class, species or rules chapter has a few dozen children). When the parent replaces
+ * another record (`supersedes_id`) and the parent itself is visible to `scope`, that replaced record's children are
+ * included too, so a book's Wizard still lists the SRD subclasses. `columns` is written in this codebase.
+ */
 export async function selectChildren<Row>(db: D1Database, scope: DocumentScope, table: ChildTable, columns: string, parentId: string): Promise<Row[]> {
-  const sql = CHILD_QUERIES[table];
-  if (sql === undefined) throw new Error(`no children query for table "${String(table)}"`);
-  const { results } = await db.prepare(sql(columns, scope)).bind(parentId).all<Row>();
+  const q = CHILD_QUERIES[table];
+  if (q === undefined) throw new Error(`no children query for table "${String(table)}"`);
+  const vis = visibilityClause(scope);
+  const mask = maskingClause(scope, table);
+  const pvis = visibilityClause(scope, "pd");
+  const replaced = `(SELECT p.supersedes_id FROM ${q.parentTable} p JOIN documents pd ON pd.key = p.document_key WHERE p.id = ? AND p.supersedes_id IS NOT NULL AND p.supersedes_id <> p.id AND ${pvis.sql})`;
+  const { results } = await db
+    .prepare(`SELECT ${columns} FROM ${table} t JOIN documents d ON d.key = t.document_key WHERE ${vis.sql} AND ${mask.sql} AND ${q.column} IN (?, ${replaced}) ORDER BY ${q.order}`)
+    .bind(...vis.params, ...mask.params, parentId, parentId, ...pvis.params)
+    .all<Row>();
   return results;
 }
 
-/** Documents visible to `scope`, as JSON rows. */
+/** Documents visible to `scope`, as JSON rows, with per-table record counts that follow the same visibility and masking rules as the lists. */
 export async function selectDocuments(db: D1Database, scope: DocumentScope) {
+  const vis = visibilityClause(scope);
   const [docs, ...counts] = await db.batch([
-    db.prepare(`SELECT d.data AS data FROM documents d WHERE ${visibilityClause(scope)} ORDER BY d.display_name COLLATE NOCASE, d.key`),
-    ...RULE_TABLES.map((t) => db.prepare(`SELECT t.document_key AS document_key, COUNT(*) AS n FROM ${t} t JOIN documents d ON d.key = t.document_key WHERE ${visibilityClause(scope)} GROUP BY t.document_key`)),
+    db.prepare(`SELECT d.data AS data FROM documents d WHERE ${vis.sql} ORDER BY d.display_name COLLATE NOCASE, d.key`).bind(...vis.params),
+    ...RULE_TABLES.map((t) => {
+      const mask = maskingClause(scope, t);
+      return db
+        .prepare(`SELECT t.document_key AS document_key, COUNT(*) AS n FROM ${t} t JOIN documents d ON d.key = t.document_key WHERE ${vis.sql} AND ${mask.sql} GROUP BY t.document_key`)
+        .bind(...vis.params, ...mask.params);
+    }),
   ]);
   return { docs: docs?.results ?? [], counts };
 }
@@ -169,13 +235,15 @@ export async function selectDocuments(db: D1Database, scope: DocumentScope) {
  * contribute nothing here.
  */
 export async function selectLicenses(db: D1Database, scope: DocumentScope) {
+  const vis = visibilityClause(scope);
   const { results } = await db
     .prepare(
       `SELECT l.key, l.name, l.url, l.text FROM licenses l WHERE EXISTS (
          SELECT 1 FROM documents d, json_each(d.data, '$.licenses') j
-         WHERE ${visibilityClause(scope)} AND json_extract(j.value, '$.key') = l.key
+         WHERE ${vis.sql} AND json_extract(j.value, '$.key') = l.key
        ) ORDER BY l.name COLLATE NOCASE, l.key`,
     )
+    .bind(...vis.params)
     .all();
   return results;
 }

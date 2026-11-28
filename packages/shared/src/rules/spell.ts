@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AbilityKey, DocumentKey, RecordId, DmOnly } from "./common.js";
+import { AbilityKey, DocumentKey, RecordId, DmOnly, Supersedes } from "./common.js";
 
 export const SpellLevel = z.number().int().min(0).max(9);
 
@@ -35,6 +35,7 @@ export type SpellSummary = z.infer<typeof SpellSummary>;
 
 export const Spell = SpellSummary.extend({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   description: z.string(),
   higherLevel: z.string().nullable(),
   /** Duration as written, e.g. `Instantaneous`. */

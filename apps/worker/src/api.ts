@@ -3,6 +3,8 @@ import { Hono } from "hono";
 import pkg from "../package.json" with { type: "json" };
 import type { AppEnv } from "./env.js";
 import { requireAccess } from "./auth/access.js";
+import { canReadPrivateBooks, isAdmin, ownerEmail } from "./auth/permissions.js";
+import { adminRoutes } from "./admin/routes.js";
 import { rulesRoutes } from "./rules/routes.js";
 
 /**
@@ -22,6 +24,31 @@ api.get("/health", (c) => {
   return c.json(body);
 });
 
-api.get("/me", (c) => c.json(MeResponse.parse({ email: c.get("identity").email })));
+/**
+ * Who am I. The web app calls this once on load, so it is also where a person is recorded as "has signed in"
+ * (the admin page lists them). `isAdmin` only decides whether the admin link shows; admin routes check again.
+ */
+api.get("/me", async (c) => {
+  const identity = c.get("identity");
+  // Only verified users are recorded, and only when the row is missing or its last_seen is over an hour old, so a
+  // page load is usually a no-op. The write is off the response path (waitUntil), and a failure is logged, never fatal.
+  const record = async () => {
+    try {
+      const now = Date.now();
+      await c.env.DB.prepare(
+        "INSERT INTO users (email, first_seen, last_seen) VALUES (?, ?, ?) ON CONFLICT(email) DO UPDATE SET last_seen = excluded.last_seen WHERE users.last_seen < ?",
+      )
+        .bind(ownerEmail(identity), new Date(now).toISOString(), new Date(now).toISOString(), new Date(now - 60 * 60 * 1000).toISOString())
+        .run();
+    } catch (err) {
+      console.error("could not record sign-in", err);
+    }
+  };
+  if (canReadPrivateBooks(identity)) c.executionCtx.waitUntil(record());
+  c.header("Cache-Control", "private, no-store");
+  return c.json(MeResponse.parse({ email: identity.email, isAdmin: isAdmin(identity, c.env) }));
+});
+
+api.route("/admin", adminRoutes);
 
 api.route("/rules", rulesRoutes);

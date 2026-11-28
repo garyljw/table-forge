@@ -427,7 +427,7 @@ export async function runStatements(statements: string[]): Promise<void> {
 
 /** Removes everything, then loads the Open5e seed (via the real import SQL) and a private document's rows. */
 export async function seedRules(): Promise<void> {
-  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections", "rule_chapters", "rules", "items", "item_sets", "reference_entries", "documents", "licenses"].map((t) => `DELETE FROM ${t};`);
+  const clear = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections", "rule_chapters", "rules", "items", "item_sets", "reference_entries", "documents", "licenses", "book_owners", "users"].map((t) => `DELETE FROM ${t};`);
   const j = (v: unknown) => JSON.stringify(v);
   const priv = [
     env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(
@@ -542,4 +542,28 @@ function rollTableInsert(x: RollTable, run: string | null) {
   return env.DB.prepare("INSERT INTO roll_tables (id, document_key, name, name_search, category, dice, data, import_run) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(
     x.id, x.documentKey, x.name, foldName(x.name), x.category, x.dice, JSON.stringify(x), run,
   );
+}
+
+/** Ticks: this email owns these private books. Emails are stored the way the admin API stores them. */
+export async function own(email: string, ...documentKeys: string[]): Promise<void> {
+  await env.DB.batch(
+    documentKeys.map((k) => env.DB.prepare("INSERT OR IGNORE INTO book_owners (email, document_key, granted_at) VALUES (?, ?, ?)").bind(email.trim().toLowerCase(), k, "2026-01-01T00:00:00.000Z")),
+  );
+}
+
+/** Adds a second private book ("other-book") with one invented spell, standing in for a book the caller may not own. */
+export async function addOtherBook(): Promise<void> {
+  const doc = { ...secret, key: "other-book", name: "Other Book", displayName: "Other Book" };
+  const spellRow = { ...spell("other_spell", "Other Book Spell", { documentKey: "other-book" }) };
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(doc.key, doc.name, doc.displayName, doc.gameSystem, JSON.stringify(doc)),
+    env.DB.prepare("INSERT INTO spells (id, document_key, name, name_search, level, school, classes, concentration, ritual, casting_time, range_text, data) VALUES (?, ?, ?, ?, 1, 'evocation', '', 0, 0, 'action', '60 feet', ?)").bind(
+      spellRow.id, spellRow.documentKey, spellRow.name, foldName(spellRow.name), JSON.stringify(spellRow),
+    ),
+  ]);
+}
+
+/** Marks `supersederId` (a book record) as replacing `replacedId` in `table`. */
+export async function supersede(table: string, supersederId: string, replacedId: string): Promise<void> {
+  await env.DB.prepare(`UPDATE ${table} SET supersedes_id = ? WHERE id = ?`).bind(replacedId, supersederId).run();
 }

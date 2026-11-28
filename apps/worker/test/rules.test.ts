@@ -292,9 +292,9 @@ describe("species", () => {
 
   it("lists subspecies in a fixed query, and an unknown table is refused", async () => {
     const { selectChildren } = await import("../src/rules/db.js");
-    const rows = await selectChildren<{ name: string }>(env.DB, { includePrivate: false }, "species", "t.name", "srd_elf");
+    const rows = await selectChildren<{ name: string }>(env.DB, { email: null }, "species", "t.name", "srd_elf");
     expect(rows.map((r) => r.name)).toEqual(["High Elf", "Wood Elf"]);
-    await expect(selectChildren(env.DB, { includePrivate: false }, "spells; DROP TABLE species" as never, "t.name", "x")).rejects.toThrow(/no children query/);
+    await expect(selectChildren(env.DB, { email: null }, "spells; DROP TABLE species" as never, "t.name", "x")).rejects.toThrow(/no children query/);
     expect(await names("/species")).toContain("Elf");
   });
 

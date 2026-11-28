@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId, DmOnly } from "./common.js";
+import { DocumentKey, RecordId, DmOnly, Supersedes } from "./common.js";
 
 export const MonsterSpeed = z.object({
   walk: z.number().int().nullable(),
@@ -65,6 +65,7 @@ export type MonsterSummary = z.infer<typeof MonsterSummary>;
 
 export const Monster = MonsterSummary.extend({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   /** Open5e subcategory, e.g. `Dragons, Chromatic`. */
   subtype: z.string().nullable(),
   alignment: z.string(),

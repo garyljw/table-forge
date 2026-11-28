@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DmOnly, DocumentKey, RecordId } from "./common.js";
+import { DmOnly, Supersedes, DocumentKey, RecordId } from "./common.js";
 
 export const RollTableCategory = z.enum(["treasure", "encounter", "npc", "madness", "trinket", "dungeon", "other"]);
 export type RollTableCategory = z.infer<typeof RollTableCategory>;
@@ -36,6 +36,7 @@ export type RollTableSummary = z.infer<typeof RollTableSummary>;
  */
 export const RollTable = RollTableSummary.extend({
   dmOnly: DmOnly,
+  supersedes: Supersedes,
   description: z.string().nullable(),
   /** Column headings after the roll column, e.g. `["Item"]` or `["Trinket", "Value"]`. */
   columns: z.array(z.string().min(1)).min(1),
