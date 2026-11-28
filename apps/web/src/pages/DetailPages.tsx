@@ -260,10 +260,25 @@ export function ItemSetDetailPage({ id }: { id: string }) {
 
 export function RuleChapterPage({ id }: { id: string }) {
   const state = useApi((s) => getRuleChapter(id, s), id);
-  // A link from the rules search lands on `#<rule id>`; scroll there once the chapter has rendered.
+  // A link from the rules search lands on `#<rule id>`; scroll there once the chapter has rendered,
+  // and again whenever the hash changes while the chapter stays open.
   const loaded = state.status === "ok";
   useEffect(() => {
-    if (loaded && window.location.hash) document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView();
+    if (!loaded) return;
+    const scrollToHash = () => {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+      let target = hash;
+      try {
+        target = decodeURIComponent(hash);
+      } catch {
+        // A malformed escape: use the text as written.
+      }
+      document.getElementById(target)?.scrollIntoView();
+    };
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
   }, [loaded, id]);
   return (
     <DetailFrame

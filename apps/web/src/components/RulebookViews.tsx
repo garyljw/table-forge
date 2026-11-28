@@ -1,13 +1,14 @@
 import type { Rule, RuleChapterDetailResponse } from "@table-forge/shared";
 import { Markdown } from "./Markdown.js";
 
-/** A rule's title at its own heading level, with the body's headings nested beneath it. */
+/** A rule's title at its own heading level (never h1: the page's chapter title is the h1), with the body's headings nested beneath it. */
 export function RuleArticle({ rule }: { rule: Rule }) {
-  const Title = `h${rule.headerLevel}` as "h1";
+  const level = Math.min(6, Math.max(2, rule.headerLevel));
+  const Title = `h${level}` as "h2";
   return (
     <section className="rule" id={rule.id}>
       <Title>{rule.name}</Title>
-      <Markdown headingStart={Math.min(6, rule.headerLevel + 1)}>{rule.body}</Markdown>
+      <Markdown headingStart={Math.min(6, level + 1)}>{rule.body}</Markdown>
     </section>
   );
 }

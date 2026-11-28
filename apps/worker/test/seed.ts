@@ -1,4 +1,4 @@
-import { buildImportStatements, foldName, type ImportBundle } from "@table-forge/core";
+import { buildImportStatements, chapterSortIndex, foldName, type ImportBundle } from "@table-forge/core";
 import type { Armor, Background, ClassDetail, Condition, Feat, Item, ItemSet, LicenseText, MagicItem, Monster, ReferenceEntry, RollTable, Rule, RuleChapter, RuleSection, MonsterFeature, SourceDocument, Species, Spell, Weapon } from "@table-forge/shared";
 import { env } from "cloudflare:workers";
 
@@ -500,7 +500,7 @@ export async function seedRules(): Promise<void> {
       .map((x) => ruleSectionInsert(x, null)),
     ...SEED.ruleChapters
       .filter((x) => x.documentKey === "secret-book")
-      .map((x) => env.DB.prepare("INSERT INTO rule_chapters (id, document_key, name, name_search, data) VALUES (?, ?, ?, ?, ?)").bind(x.id, x.documentKey, x.name, foldName(x.name), j(x))),
+      .map((x) => env.DB.prepare("INSERT INTO rule_chapters (id, document_key, name, name_search, sort_index, data) VALUES (?, ?, ?, ?, ?, ?)").bind(x.id, x.documentKey, x.name, foldName(x.name), chapterSortIndex(x.id), j(x))),
     ...SEED.rules
       .filter((x) => x.documentKey === "secret-book")
       .map((x) =>
@@ -520,7 +520,7 @@ export async function seedRules(): Promise<void> {
       .map((x) => env.DB.prepare("INSERT INTO item_sets (id, document_key, name, name_search, item_count, data) VALUES (?, ?, ?, ?, ?, ?)").bind(x.id, x.documentKey, x.name, foldName(x.name), x.itemCount, j(x))),
     ...SEED.referenceEntries
       .filter((x) => x.documentKey === "secret-book")
-      .map((x) => env.DB.prepare("INSERT INTO reference_entries (id, kind, document_key, name, name_search, data) VALUES (?, ?, ?, ?, ?, ?)").bind(x.id, x.kind, x.documentKey, x.name, foldName(x.name), j(x))),
+      .map((x) => env.DB.prepare("INSERT INTO reference_entries (id, kind, document_key, name, name_search, sort_rank, data) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(x.id, x.kind, x.documentKey, x.name, foldName(x.name), "rank" in x ? x.rank : null, j(x))),
   ];
   await env.DB.batch([...clear.map((s) => env.DB.prepare(s)), ...priv]);
   // Open5e rows go in afterwards: the document guard needs the documents to exist, and the

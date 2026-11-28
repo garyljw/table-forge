@@ -7,8 +7,9 @@ import { referenceFacts } from "../components/ReferenceView.js";
 import { costLabel, weightLabel } from "../format.js";
 import { SRD_DOCUMENT } from "../test-fixtures.js";
 import { ItemDetailPage, ItemSetDetailPage, RuleChapterPage } from "./DetailPages.js";
+import { RuleArticle } from "../components/RulebookViews.js";
 import { EquipmentPage, gearApiParams, packApiParams, equipmentTab } from "./EquipmentPage.js";
-import { ReferencePage, inReadingOrder, referenceApiParams, referenceKind } from "./ReferencePage.js";
+import { ReferencePage, referenceApiParams, referenceKind } from "./ReferencePage.js";
 import { RulebookPage, rulebookApiParams } from "./RulebookPage.js";
 
 const urls: string[] = [];
@@ -45,7 +46,7 @@ function body(url: string): unknown {
     return { data: { ...base, id: "test-pack", name: "Test Pack", itemCount: 1, description: "Holds a rope.", items: [{ id: "srd_rope", name: "Rope" }] }, document: SRD_DOCUMENT };
   if (url.startsWith("/api/rules/item-sets")) return page([{ id: "test-pack", documentKey: "srd-2014", name: "Test Pack", itemCount: 1 }]);
   if (url.startsWith("/api/rules/reference")) {
-    if (url.includes("kind=size")) return page([large, tiny]);
+    if (url.includes("kind=size")) return page([tiny, large]); // the API returns sizes in rank order
     if (url.includes("kind=language")) return page([abyssal]);
     return page([{ ...base, id: "srd-2014_ability_str", kind: "ability", name: "Strength", description: "Strength measures **power**.\n\n### Strength Checks", abbreviation: "str", abilityKey: "strength" }]);
   }
@@ -131,9 +132,36 @@ describe("rules chapter", () => {
     await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
     window.location.hash = "";
   });
+
+  it("scrolls again when the hash changes on the open chapter", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    window.location.hash = "";
+    renderAt("/rulebook/srd_combat", <RuleChapterPage id="srd_combat" />);
+    await screen.findByText("Surprise");
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    window.location.hash = "#srd_combat_attack";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    window.location.hash = "";
+  });
+});
+
+describe("rule titles", () => {
+  it("never use h1, and nest the body one level below the title", () => {
+    const rule = { id: "r", name: "Top Rule", headerLevel: 1, body: "# Inner", order: 1 } as unknown as Parameters<typeof RuleArticle>[0]["rule"];
+    render(<RuleArticle rule={rule} />);
+    expect(screen.getAllByRole("heading").map((h) => `${h.tagName}:${h.textContent}`)).toEqual(["H2:Top Rule", "H3:Inner"]);
+  });
 });
 
 describe("markdown heading start", () => {
+  it("keeps the same heading elements across re-renders (no remount)", () => {
+    const { rerender } = render(<Markdown headingStart={3}>{"## One"}</Markdown>);
+    const before = screen.getByRole("heading");
+    rerender(<Markdown headingStart={3}>{"## One"}</Markdown>);
+    expect(screen.getByRole("heading")).toBe(before);
+  });
   it("finds the shallowest heading", () => {
     expect(shallowestHeading("text\n\n### A\n\n#### B")).toBe(3);
     expect(shallowestHeading("no headings")).toBeNull();
@@ -235,13 +263,20 @@ describe("reference page", () => {
     await screen.findByText(/Source:/);
   });
 
-  it("shows sizes in rank order with their facts, and a note for an empty description", async () => {
+  it("shows sizes as the API orders them, with their facts, and a note for an empty description", async () => {
     renderAt("/reference?kind=size", <ReferencePage />);
     await screen.findByText("Tiny");
     expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Tiny", "Large"]);
     expect(screen.getByText("Space 2.5 ft.")).toBeTruthy();
     expect(screen.getByText("Hit die d10")).toBeTruthy();
     expect(screen.getByText("No description in the source.")).toBeTruthy();
+  });
+
+  it("lists sources without counts, as the counts cover every kind", async () => {
+    renderAt("/reference?kind=size", <ReferencePage />);
+    await screen.findByText("Tiny");
+    const option = await screen.findByRole("option", { name: SRD_DOCUMENT.displayName });
+    expect(option.textContent).toBe(SRD_DOCUMENT.displayName);
   });
 
   it("shows language flags and script", async () => {
@@ -257,11 +292,6 @@ describe("reference page", () => {
     const p = referenceApiParams(new URLSearchParams("kind=skill&q=ath&evil=1"));
     expect(p).toMatchObject({ kind: "skill", q: "ath" });
     expect(p).not.toHaveProperty("evil");
-  });
-
-  it("sorts only sizes and rarities by rank", () => {
-    const entries = [large, tiny, abyssal] as unknown as Parameters<typeof inReadingOrder>[0];
-    expect(inReadingOrder(entries).map((e) => e.name)).toEqual(["Tiny", "Large", "Abyssal"]);
   });
 
   it("describes the facts of each kind", () => {

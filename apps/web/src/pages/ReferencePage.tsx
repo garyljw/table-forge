@@ -1,4 +1,4 @@
-import { REFERENCE_KINDS, type ReferenceEntry, type ReferenceKind } from "@table-forge/shared";
+import { REFERENCE_KINDS, type ReferenceKind } from "@table-forge/shared";
 import { Link } from "wouter";
 import { listReference } from "../api/rules.js";
 import { Filters, SearchBox, SourceFilter } from "../components/FilterBar.js";
@@ -34,11 +34,6 @@ export function referenceApiParams(params: URLSearchParams) {
   return { kind: referenceKind(params), q: get("q"), document: get("document"), page: get("page"), pageSize: 100 };
 }
 
-/** Sizes and rarities read in rank order; everything else stays in the name order the API gives. */
-export function inReadingOrder(entries: ReferenceEntry[]): ReferenceEntry[] {
-  return [...entries].sort((a, b) => ((a.kind === "size" || a.kind === "item-rarity") && a.kind === b.kind ? a.rank - b.rank : 0));
-}
-
 function Tabs({ kind }: { kind: ReferenceKind }) {
   return (
     <div className="tabs" role="tablist" aria-label="Kind of reference">
@@ -70,7 +65,7 @@ export function ReferencePage() {
       <Tabs kind={kind} />
       <Filters>
         <SearchBox label={`Search ${REFERENCE_KIND_LABELS[kind].toLowerCase()} by name`} value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
-        <SourceFilter kind="reference_entries" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="reference_entries" showCounts={false} value={params.get("document") ?? ""} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (
@@ -78,7 +73,7 @@ export function ReferencePage() {
             <Results data={data} empty={`No ${REFERENCE_KIND_LABELS[kind].toLowerCase()} match those filters.`} onPage={(p) => update({ page: p === 1 ? undefined : String(p) })}>
               {(items) => (
                 <>
-                  {inReadingOrder(items).map((e) => (
+                  {items.map((e) => (
                     <ReferenceEntryView key={e.id} entry={e} />
                   ))}
                 </>

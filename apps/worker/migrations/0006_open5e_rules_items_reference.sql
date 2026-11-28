@@ -12,11 +12,15 @@ CREATE TABLE rule_chapters (
   document_key TEXT NOT NULL,
   name         TEXT NOT NULL,
   name_search  TEXT NOT NULL,
+  -- Position in the SRD's own chapter order (see SRD_2014_CHAPTER_ORDER in packages/core). Chapters not in
+  -- that list (other documents) share the last slot and fall back to name order.
+  sort_index   INTEGER NOT NULL DEFAULT 1000,
   data         TEXT NOT NULL,
   import_run   TEXT
 );
 CREATE INDEX rule_chapters_document ON rule_chapters (document_key);
 CREATE INDEX rule_chapters_name ON rule_chapters (name COLLATE NOCASE);
+CREATE INDEX rule_chapters_order ON rule_chapters (sort_index, name COLLATE NOCASE);
 
 CREATE TABLE rules (
   id           TEXT PRIMARY KEY,
@@ -68,6 +72,8 @@ CREATE TABLE reference_entries (
   document_key TEXT NOT NULL,
   name         TEXT NOT NULL,
   name_search  TEXT NOT NULL,
+  -- The rank of a size or item rarity (smallest / commonest first); NULL for kinds with no rank.
+  sort_rank    INTEGER,
   data         TEXT NOT NULL,
   import_run   TEXT
 );

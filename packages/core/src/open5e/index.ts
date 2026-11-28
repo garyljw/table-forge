@@ -8,6 +8,8 @@ export {
   LICENSE_URLS,
   OPEN5E_API_BASE,
   OPEN5E_CONTENT_RULES,
+  SRD_2014_CHAPTER_ORDER,
+  chapterSortIndex,
   RARITY_DOCUMENT_KEY,
   type DocumentLike,
 } from "./config.js";

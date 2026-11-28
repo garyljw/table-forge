@@ -62,17 +62,20 @@ export function SourceFilter({
   kind,
   value,
   update,
+  showCounts = true,
 }: {
   kind: RuleKind;
   value: string;
   update: (patch: ParamPatch) => void;
+  /** Turn off when the list shows only part of the table (one reference kind), as the counts cover the whole table. */
+  showCounts?: boolean;
 }) {
   const docs = useApi(() => getDocuments(), "documents");
   const options =
     docs.status === "ok"
       ? docs.data.items
           .filter((d) => d.counts[kind] > 0)
-          .map((d) => ({ value: d.key, label: `${d.displayName} (${d.counts[kind]})` }))
+          .map((d) => ({ value: d.key, label: showCounts ? `${d.displayName} (${d.counts[kind]})` : d.displayName }))
       : [];
   return (
     <>

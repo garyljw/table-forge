@@ -20,6 +20,7 @@ import {
   type Weapon,
 } from "@table-forge/shared";
 import { foldName } from "../fold.js";
+import { chapterSortIndex } from "./config.js";
 
 /**
  * SQL for an Open5e import. The tables are defined in apps/worker/migrations.
@@ -334,6 +335,7 @@ export function ruleChapterStatement(c: RuleChapter, run: string): string {
       ["document_key", sqlText(c.documentKey)],
       ["name", sqlText(c.name)],
       ["name_search", sqlText(foldName(c.name))],
+      ["sort_index", sqlInt(chapterSortIndex(c.id))],
       ["data", json(c)],
     ],
     run,
@@ -404,6 +406,7 @@ export function referenceEntryStatement(e: ReferenceEntry, run: string): string 
       ["document_key", sqlText(e.documentKey)],
       ["name", sqlText(e.name)],
       ["name_search", sqlText(foldName(e.name))],
+      ["sort_rank", "rank" in e ? sqlInt(e.rank) : "NULL"],
       ["data", json(e)],
     ],
     run,

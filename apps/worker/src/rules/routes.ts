@@ -532,7 +532,7 @@ rulesRoutes.get("/rule-chapters", async (c) => {
   if (!parsed.ok) return parsed.response;
   const q = parsed.query;
   const where = new Where(scope).nameContains(q.q).document(q.document);
-  const { rows, total } = await selectPage<NamedRow>(c.env.DB, "rule_chapters", "t.id, t.document_key, t.name", where, q.page, q.pageSize);
+  const { rows, total } = await selectPage<NamedRow>(c.env.DB, "rule_chapters", "t.id, t.document_key, t.name", where, q.page, q.pageSize, "chapter");
   const items = rows.map((r) => ({ id: r.id, documentKey: r.document_key, name: r.name }));
   return c.json(RuleChapterListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
 });
@@ -543,11 +543,8 @@ rulesRoutes.get("/rule-chapters/:id", async (c) => {
   const found = id.success ? await selectDetail(c.env.DB, scope, "rule_chapters", id.data) : null;
   if (!id.success || !found) return notFound(c, "Rules chapter");
   const rows = await selectChildren<{ data: string }>(c.env.DB, scope, "rules", "t.data AS data", id.data);
-  // A rule whose stored JSON no longer fits the schema is left out rather than failing the whole chapter.
-  const rules = rows.flatMap((r) => {
-    const rule = Rule.safeParse(JSON.parse(r.data));
-    return rule.success ? [rule.data] : [];
-  });
+  // Like the other routes, a stored row that no longer fits its schema fails the request (a 500) instead of being hidden.
+  const rules = rows.map((r) => Rule.parse(JSON.parse(r.data)));
   return c.json(RuleChapterDetailResponse.parse({ ...found, rules }));
 });
 
@@ -630,12 +627,9 @@ rulesRoutes.get("/reference", async (c) => {
   const q = parsed.query;
   const where = new Where(scope).nameContains(q.q).document(q.document);
   if (q.kind !== undefined) where.add("t.kind = ?", q.kind);
-  const { rows, total } = await selectPage<{ data: string }>(c.env.DB, "reference_entries", "t.data AS data", where, q.page, q.pageSize);
-  // One malformed row is left out of the list rather than failing the whole response.
-  const items = rows.flatMap((r) => {
-    const entry = ReferenceEntry.safeParse(JSON.parse(r.data));
-    return entry.success ? [entry.data] : [];
-  });
+  const { rows, total } = await selectPage<{ data: string }>(c.env.DB, "reference_entries", "t.data AS data", where, q.page, q.pageSize, "reference");
+  // Like the other routes, a stored row that no longer fits its schema fails the request (a 500) instead of being hidden.
+  const items = rows.map((r) => ReferenceEntry.parse(JSON.parse(r.data)));
   return c.json(ReferenceListResponse.parse(pageEnvelope(items, total, q.page, q.pageSize)));
 });
 

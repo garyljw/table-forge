@@ -5,6 +5,7 @@ import { normaliseItem, normaliseItemSet } from "./item.js";
 import { normaliseReference } from "./reference.js";
 import { normaliseRule, normaliseRuleChapter } from "./rulebook.js";
 import { documentKeyOf } from "./text.js";
+import { SRD_2014_CHAPTER_ORDER, chapterSortIndex } from "./config.js";
 import { itemSetStatement, itemStatement, referenceEntryStatement, ruleChapterStatement, ruleStatement } from "./sql.js";
 
 const included = (key: string) => key === "srd-2014" || key === "core" || key === "tob";
@@ -50,10 +51,25 @@ describe("rules chapters and rules", () => {
   });
 
   it("builds upserts that carry the chapter link and sort index", () => {
-    expect(ruleChapterStatement(normaliseRuleChapter(fx.combatChapter), "r1")).toContain("INSERT INTO rule_chapters");
+    const chapterSql = ruleChapterStatement(normaliseRuleChapter(fx.combatChapter), "r1");
+    expect(chapterSql).toContain("INSERT INTO rule_chapters (id, document_key, name, name_search, sort_index, data, import_run)");
+    expect(chapterSql).toContain(`'Combat Sequence', 'combat sequence', ${chapterSortIndex("srd_combat-sequence")},`);
     const st = ruleStatement(normaliseRule(fx.surpriseRule, chapters), "r1");
     expect(st).toContain("INSERT INTO rules (id, document_key, chapter_id, chapter_name, name, name_search, sort_index, data, import_run)");
     expect(st).toContain("'srd_combat-sequence', 'Combat Sequence', 'Surprise', 'surprise', 2,");
+  });
+});
+
+describe("chapter order", () => {
+  it("follows the SRD book order, with unlisted chapters after the listed ones", () => {
+    expect(chapterSortIndex("srd_leveling-up")).toBe(0);
+    expect(chapterSortIndex("srd_combat-sequence")).toBeLessThan(chapterSortIndex("srd_spellcasting"));
+    expect(chapterSortIndex("srd_abilities")).toBeLessThan(chapterSortIndex("srd_combat-sequence"));
+    expect(chapterSortIndex("srd-2024_combat")).toBe(SRD_2014_CHAPTER_ORDER.length);
+  });
+
+  it("lists each chapter once", () => {
+    expect(new Set(SRD_2014_CHAPTER_ORDER).size).toBe(SRD_2014_CHAPTER_ORDER.length);
   });
 });
 
@@ -174,7 +190,9 @@ describe("reference entries", () => {
 
   it("builds an upsert keyed on kind", () => {
     const st = referenceEntryStatement(ReferenceEntry.parse(normaliseReference("size", fx.sizeLarge, included)[0]), "r1");
-    expect(st).toContain("INSERT INTO reference_entries (id, kind, document_key, name, name_search, data, import_run)");
-    expect(st).toContain("'core_size_large', 'size', 'core', 'Large', 'large',");
+    expect(st).toContain("INSERT INTO reference_entries (id, kind, document_key, name, name_search, sort_rank, data, import_run)");
+    expect(st).toContain("'core_size_large', 'size', 'core', 'Large', 'large', 4,");
+    const language = referenceEntryStatement(ReferenceEntry.parse(normaliseReference("language", fx.languageAbyssal, included)[0]), "r1");
+    expect(language).toContain("'abyssal', NULL,");
   });
 });

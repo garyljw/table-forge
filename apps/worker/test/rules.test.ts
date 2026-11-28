@@ -507,6 +507,20 @@ describe("rules chapters and rules", () => {
     expect(await names("/rule-chapters?pageSize=2&page=2")).toEqual(["Test Magic"]);
   });
 
+  it("lists chapters in book order, not name order, with unlisted ones last by name", async () => {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE rule_chapters SET sort_index = 1 WHERE id = 'srd_test-magic'"),
+      env.DB.prepare("UPDATE rule_chapters SET sort_index = 5 WHERE id = 'srd_test-combat'"),
+    ]);
+    expect(await names("/rule-chapters")).toEqual(["Test Magic", "Test Combat", "Test Extras"]);
+    expect(await names("/rule-chapters?pageSize=2&page=2")).toEqual(["Test Extras"]);
+  });
+
+  it("fails the chapter, rather than hiding a rule, when a stored rule no longer fits its schema", async () => {
+    await env.DB.prepare("UPDATE rules SET data = json_remove(data, '$.body') WHERE id = 'srd_test-combat_attack'").run();
+    expect((await get("/rule-chapters/srd_test-combat")).status).toBe(500);
+  });
+
   it("returns a chapter with its rules in reading order, not name order", async () => {
     const detail = RuleChapterDetailResponse.parse(await (await get("/rule-chapters/srd_test-combat")).json());
     expect(detail.data).toMatchObject({ name: "Test Combat", description: "Test Combat introduction" });
@@ -629,7 +643,7 @@ describe("reference entries", () => {
   });
 
   it("filters by kind, source and name", async () => {
-    expect(await names("/reference?kind=size")).toEqual(["Large", "Tiny"]);
+    expect(await names("/reference?kind=size")).toEqual(["Tiny", "Large"]);
     expect(await names("/reference?kind=language")).toEqual(["Abyssal", "Common", "Void Speech"]);
     expect(await names("/reference?kind=language&document=tob")).toEqual(["Void Speech"]);
     expect(await names("/reference?q=acid")).toEqual(["Acid"]);
@@ -648,9 +662,14 @@ describe("reference entries", () => {
     expect(detail.document.key).toBe("srd-2014");
   });
 
-  it("leaves out a row that no longer fits its schema, instead of failing the list", async () => {
+  it("puts sizes in rank order, not name order", async () => {
+    // Large (rank 4) sorts before Tiny (rank 0) by name, so the rank order is what puts Tiny first.
+    expect(await names("/reference?kind=size")).toEqual(["Tiny", "Large"]);
+  });
+
+  it("fails the list, rather than hiding a row, when a stored row no longer fits its schema", async () => {
     await env.DB.prepare("UPDATE reference_entries SET data = json_remove(data, '$.rank') WHERE id = 'srd-2014_size_large'").run();
-    expect(await names("/reference?kind=size")).toEqual(["Tiny"]);
+    expect((await get("/reference?kind=size")).status).toBe(500);
   });
 
   it("never serves a private entry, and rejects bad parameters", async () => {
