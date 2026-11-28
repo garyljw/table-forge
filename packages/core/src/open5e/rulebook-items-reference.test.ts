@@ -52,10 +52,10 @@ describe("rules chapters and rules", () => {
 
   it("builds upserts that carry the chapter link and sort index", () => {
     const chapterSql = ruleChapterStatement(normaliseRuleChapter(fx.combatChapter), "r1");
-    expect(chapterSql).toContain("INSERT INTO rule_chapters (id, document_key, name, name_search, sort_index, supersedes_id, data, import_run)");
+    expect(chapterSql).toContain("INSERT INTO rule_chapters (id, document_key, name, name_search, sort_index, data, import_run)");
     expect(chapterSql).toContain(`'Combat Sequence', 'combat sequence', ${chapterSortIndex("srd_combat-sequence")},`);
     const st = ruleStatement(normaliseRule(fx.surpriseRule, chapters), "r1");
-    expect(st).toContain("INSERT INTO rules (id, document_key, chapter_id, chapter_name, name, name_search, sort_index, supersedes_id, data, import_run)");
+    expect(st).toContain("INSERT INTO rules (id, document_key, chapter_id, chapter_name, name, name_search, sort_index, data, import_run)");
     expect(st).toContain("'srd_combat-sequence', 'Combat Sequence', 'Surprise', 'surprise', 2,");
   });
 });
@@ -98,7 +98,7 @@ describe("items", () => {
 
   it("builds an upsert with the filter columns", () => {
     const st = itemStatement(normaliseItem(fx.battleaxeItem), "r1");
-    expect(st).toContain("INSERT INTO items (id, document_key, name, name_search, category, cost_gp, weight_lb, weapon_id, armor_id, supersedes_id, data, import_run)");
+    expect(st).toContain("INSERT INTO items (id, document_key, name, name_search, category, cost_gp, weight_lb, weapon_id, armor_id, data, import_run)");
     expect(st).toContain("'weapon', 10, 4, 'srd_battleaxe', NULL,");
     expect(itemStatement(normaliseItem(fx.acidItem), "r1")).toContain("0, NULL, NULL, NULL,");
   });
@@ -191,7 +191,7 @@ describe("reference entries", () => {
 
   it("builds an upsert keyed on kind", () => {
     const st = referenceEntryStatement(ReferenceEntry.parse(normaliseReference("size", fx.sizeLarge, included)[0]), "r1");
-    expect(st).toContain("INSERT INTO reference_entries (id, kind, document_key, name, name_search, sort_rank, supersedes_id, data, import_run)");
+    expect(st).toContain("INSERT INTO reference_entries (id, kind, document_key, name, name_search, sort_rank, data, import_run)");
     expect(st).toContain("'core_size_large', 'size', 'core', 'Large', 'large', 4,");
     const language = referenceEntryStatement(ReferenceEntry.parse(normaliseReference("language", fx.languageAbyssal, included)[0]), "r1");
     expect(language).toContain("'abyssal', NULL,");

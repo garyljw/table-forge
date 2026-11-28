@@ -33,9 +33,17 @@ export const DmOnly = z.boolean().default(false);
 export const RULE_TABLES = ["spells", "monsters", "classes", "conditions", "species", "backgrounds", "feats", "weapons", "armor", "magic_items", "roll_tables", "rule_sections", "rule_chapters", "rules", "items", "item_sets", "reference_entries"] as const;
 export type RuleTable = (typeof RULE_TABLES)[number];
 
+/** The document key of the 2014 SRD 5.1 (Open5e's `srd-2014`): the only document an owned book ever hides. Third-party Open5e documents and `core` are never hidden. */
+export const SRD_DOCUMENT_KEY = "srd-2014";
+
 /**
- * For a record from an owner's book: the id of the public (SRD) record it replaces. Readers who can see
- * the book record no longer see the replaced one (the worker's masking clause, apps/worker/src/rules/db.ts).
- * Absent on almost every record.
+ * Whole-book rule: a user who owns the private book with this document key no longer sees the SRD's
+ * records (`SRD_DOCUMENT_KEY`) in the listed tables. No per-record links and no name matching.
+ *
+ * Each book/table is switched on only once that part of the book is fully transcribed, otherwise SRD content
+ * would vanish for owners before the book version exists. `phb-2014` and `dmg-2014` are deliberately absent.
+ * The worker's masking clause (apps/worker/src/rules/db.ts) is the only reader of this map.
  */
-export const Supersedes = RecordId.optional();
+export const BOOK_REPLACES_SRD: Readonly<Record<string, readonly RuleTable[]>> = {
+  "mm-2014": ["monsters"],
+};

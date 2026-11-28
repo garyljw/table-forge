@@ -1,10 +1,7 @@
-import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Router, useLocation } from "wouter";
+import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SRD_DOCUMENT } from "../test-fixtures.js";
-import { SpellDetailPage } from "./DetailPages.js";
 import { AdminBooksPage } from "./AdminBooksPage.js";
 
 const OWNERS = {
@@ -99,83 +96,5 @@ describe("admin books page", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 403 })));
     renderAt("/admin/books", <AdminBooksPage />);
     expect((await screen.findByRole("alert")).textContent).toMatch(/403/);
-  });
-});
-
-describe("a detail page for a record an owned book replaces", () => {
-  const spellBody = (id: string, supersededBy?: string) => ({
-    data: { id, documentKey: "srd-2014", dmOnly: false, name: id, level: 3, school: "evocation", classes: [], concentration: false, ritual: false, castingTime: "action", range: "150 feet", description: "x", higherLevel: null, duration: "Instantaneous", reactionCondition: null, components: { verbal: true, somatic: true, material: false, materialDescription: null, materialCostGp: null, materialConsumed: false }, attackRoll: false, savingThrow: null, damageRoll: null, damageTypes: [], area: null, targetType: null, targetCount: null },
-    document: SRD_DOCUMENT,
-    ...(supersededBy ? { supersededBy } : {}),
-  });
-
-  it("never shows the superseded record while redirecting, even under StrictMode, and follows once", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: string) => {
-        const id = String(input).split("/").pop() as string;
-        return new Response(JSON.stringify(spellBody(id, id === "old_one" ? "new_one" : undefined)));
-      }),
-    );
-    let sawOld = false;
-    const watch = new MutationObserver(() => {
-      if (document.body.textContent?.includes("old_one")) sawOld = true;
-    });
-    watch.observe(document.body, { childList: true, subtree: true, characterData: true });
-    const loc = memoryLocation({ path: "/spells/old_one", record: true });
-    function Page() {
-      const [l] = useLocation();
-      return <SpellDetailPage id={l.split("/").pop() as string} />;
-    }
-    render(
-      <StrictMode>
-        <Router hook={loc.hook} searchHook={loc.searchHook}>
-          <Page />
-        </Router>
-      </StrictMode>,
-    );
-    await screen.findByText("new_one");
-    watch.disconnect();
-    expect(sawOld).toBe(false);
-    expect(loc.history).toEqual(["/spells/new_one"]);
-  });
-
-  it("does not redirect when a record names itself", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(spellBody("self_one", "self_one")))));
-    const loc = renderAt("/spells/self_one", <SpellDetailPage id="self_one" />);
-    await screen.findByText("self_one");
-    expect(loc.history).toEqual(["/spells/self_one"]);
-  });
-
-  it("follows one hop only, so a chain cannot loop", async () => {
-    const chain: Record<string, string> = { hop_a: "hop_b", hop_b: "hop_c", hop_c: "hop_a" };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: string) => {
-        const id = String(input).split("/").pop() as string;
-        return new Response(JSON.stringify(spellBody(id, chain[id])));
-      }),
-    );
-    function Page() {
-      const [loc] = useLocation();
-      return <SpellDetailPage id={loc.split("/").pop() as string} />;
-    }
-    const loc = renderAt("/spells/hop_a", <Page />);
-    await waitFor(() => expect(loc.history.at(-1)).toBe("/spells/hop_b"));
-    await screen.findByText("hop_b");
-    await new Promise((r) => setTimeout(r, 50));
-    expect(loc.history).toEqual(["/spells/hop_b"]);
-  });
-
-  it("redirects to the replacement, replacing the history entry", async () => {
-    const spell = { id: "srd_fireball", documentKey: "srd-2014", dmOnly: false, name: "Fireball" };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(JSON.stringify({ data: { ...spell, level: 3, school: "evocation", classes: [], concentration: false, ritual: false, castingTime: "action", range: "150 feet", description: "x", higherLevel: null, duration: "Instantaneous", reactionCondition: null, components: { verbal: true, somatic: true, material: false, materialDescription: null, materialCostGp: null, materialConsumed: false }, attackRoll: false, savingThrow: null, damageRoll: null, damageTypes: [], area: null, targetType: null, targetCount: null }, document: SRD_DOCUMENT, supersededBy: "phb_fireball" }))),
-    );
-    const loc = renderAt("/spells/srd_fireball", <SpellDetailPage id="srd_fireball" />);
-    await waitFor(() => expect(loc.history.at(-1)).toBe("/spells/phb_fireball"));
-    // Replaced, not pushed: the old URL is not left behind to go back to.
-    expect(loc.history).toEqual(["/spells/phb_fireball"]);
   });
 });
