@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId, DmOnly, Supersedes } from "./common.js";
+import { DocumentKey, RecordId, DmOnly } from "./common.js";
 
 /** What kind of item it is. Shields count as `armor` and ammunition as `weapon`. */
 export const MagicItemType = z.enum(["armor", "potion", "ring", "rod", "scroll", "staff", "wand", "weapon", "wondrous-item"]);
@@ -21,7 +21,6 @@ export type MagicItemSummary = z.infer<typeof MagicItemSummary>;
 
 export const MagicItem = MagicItemSummary.extend({
   dmOnly: DmOnly,
-  supersedes: Supersedes,
   /** The ordinary item it is a version of, as written: `longsword`, `any medium armor`. Null for items with no base. */
   baseItem: z.string().nullable(),
   /** Who may attune, as written: `by a cleric`. Null when anyone may, or when no attunement is needed. */

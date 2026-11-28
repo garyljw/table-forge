@@ -563,7 +563,12 @@ export async function addOtherBook(): Promise<void> {
   ]);
 }
 
-/** Marks `supersederId` (a book record) as replacing `replacedId` in `table`. */
-export async function supersede(table: string, supersederId: string, replacedId: string): Promise<void> {
-  await env.DB.prepare(`UPDATE ${table} SET supersedes_id = ? WHERE id = ?`).bind(replacedId, supersederId).run();
+/** Adds a private book with the given document key and one invented monster (`<key>_beast`, named "<key> Beast"). */
+export async function addBook(key: string): Promise<void> {
+  const doc = { ...secret, key, name: key, displayName: key };
+  const beast = monster(`${key}_beast`, `${key} Beast`, { documentKey: key });
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO documents (key, origin, visibility, name, display_name, game_system, data) VALUES (?, 'private', 'private', ?, ?, ?, ?)").bind(doc.key, doc.name, doc.displayName, doc.gameSystem, JSON.stringify(doc)),
+    env.DB.prepare("INSERT INTO monsters (id, document_key, name, name_search, size, type, challenge_rating, armor_class, hit_points, data) VALUES (?, ?, ?, ?, 'medium', 'beast', 1, 10, 10, ?)").bind(beast.id, key, beast.name, foldName(beast.name), JSON.stringify(beast)),
+  ]);
 }

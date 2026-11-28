@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DocumentKey, RecordId, DmOnly, Supersedes } from "./common.js";
+import { DocumentKey, RecordId, DmOnly } from "./common.js";
 
 export const WeaponCategory = z.enum(["simple", "martial"]);
 export type WeaponCategory = z.infer<typeof WeaponCategory>;
@@ -30,7 +30,6 @@ export type WeaponSummary = z.infer<typeof WeaponSummary>;
 
 export const Weapon = WeaponSummary.extend({
   dmOnly: DmOnly,
-  supersedes: Supersedes,
   /** An improvised weapon (no SRD 5.1 entry is one). */
   improvised: z.boolean(),
   /** Ammunition or thrown range in feet; null for a melee-only weapon. */

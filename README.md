@@ -68,7 +68,11 @@ Local D1 state is keyed by `database_id`. `pnpm dev` applies any pending migrati
 
 ### Book ownership
 
-Private book data is shown only to people the admin has ticked as owning that book on the **Book owners** page. Everyone else sees public (SRD/Open5e) content only. Where a book record has `supersedes` set to an SRD record's id, owners of that book see the book version instead of the SRD one.
+Private book data is shown only to people the admin has ticked as owning that book on the **Book owners** page. Everyone else sees public (SRD/Open5e) content only.
+
+**Whole-book rule.** Owning a book hides the SRD's records (document `srd-2014`) for the tables that book covers, for that user only. There are no per-record links and no name matching. The map is `BOOK_REPLACES_SRD` in `packages/shared/src/rules/common.ts`, and it currently holds only `"mm-2014": ["monsters"]`: ticking the Monster Manual hides the SRD monsters. The Player's Handbook and DMG are not in the map yet. A book/table is added only once that part of the book is fully transcribed, otherwise SRD content would vanish for owners before the book version exists. Lists, search, counts and children follow the rule (`maskingClause` in `apps/worker/src/rules/db.ts`); opening an SRD record by its id still works, so old links keep working. Third-party Open5e documents and `core` are never hidden. A tick only counts for a `private` document.
+
+**Database note.** The `supersedes_id` column and its indexes (migration 0007) are unused: nothing writes or reads them, and they stay NULL. They are kept so the currently deployed Worker keeps working during a deploy, and can be dropped in a later migration.
 
 The admin is whoever is listed in the `ADMIN_EMAILS` secret (comma-separated, case-insensitive). If it is missing, nobody is admin and nobody can be granted books. It is a secret, not a `wrangler.jsonc` var, so no email is in the public repo. Set it with `pnpm --filter @table-forge/worker exec wrangler secret put ADMIN_EMAILS` (production) and again with `--config wrangler.staging.jsonc` or in the dashboard for previews. The admin does not own any book automatically, so tick yourself too.
 
