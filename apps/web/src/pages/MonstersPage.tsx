@@ -2,7 +2,7 @@ import type { MonsterSummary } from "@table-forge/shared";
 import { formatChallengeRating } from "@table-forge/core";
 import { Link } from "wouter";
 import { listMonsters } from "../api/rules.js";
-import { Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { capitalise, keyOptions, safeCr } from "../format.js";
@@ -27,6 +27,7 @@ export function monsterApiParams(params: URLSearchParams) {
     crMin: get("crMin"),
     crMax: get("crMax"),
     document: get("document"),
+    core: coreParam(params) ? "true" : undefined,
     page: get("page"),
     pageSize: 25,
   };
@@ -54,7 +55,7 @@ export function MonstersPage() {
   const api = monsterApiParams(params);
   const state = useApi((s) => listMonsters(api, s), JSON.stringify(api));
   const docNames = useDocNames();
-  const hasFilters = ["q", "type", "size", "crMin", "crMax", "document"].some((k) => params.has(k));
+  const hasFilters = ["q", "type", "size", "crMin", "crMax", "document", "core"].some((k) => params.has(k));
 
   return (
     <section>
@@ -65,7 +66,7 @@ export function MonstersPage() {
         <Select label="Size" value={params.get("size") ?? ""} options={keyOptions(MONSTER_SIZES)} onChange={(size) => update({ size })} />
         <Select label="CR from" value={params.get("crMin") ?? ""} options={CR_OPTIONS} onChange={(crMin) => update({ crMin })} />
         <Select label="CR to" value={params.get("crMax") ?? ""} options={CR_OPTIONS} onChange={(crMax) => update({ crMax })} />
-        <SourceFilter kind="monsters" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="monsters" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
         {hasFilters && (
           <Link className="button-link" href="/monsters" replace>
             Clear filters

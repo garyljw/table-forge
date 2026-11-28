@@ -1,7 +1,7 @@
 import type { ConditionSummary } from "@table-forge/shared";
 import { useState } from "react";
 import { getCondition, listConditions } from "../api/rules.js";
-import { Filters, SearchBox, SourceFilter } from "../components/FilterBar.js";
+import { coreParam, Filters, SearchBox, SourceFilter } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Markdown } from "../components/Markdown.js";
 import { SourceLine } from "../components/SourceLine.js";
@@ -37,6 +37,7 @@ export function ConditionsPage() {
   const api = {
     q: params.get("q") ?? undefined,
     document: params.get("document") ?? undefined,
+    core: coreParam(params) ? "true" : undefined,
     page: params.get("page") ?? undefined,
     pageSize: 30,
   };
@@ -46,7 +47,7 @@ export function ConditionsPage() {
       <h1>Conditions</h1>
       <Filters>
         <SearchBox label="Search conditions" value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
-        <SourceFilter kind="conditions" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="conditions" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (

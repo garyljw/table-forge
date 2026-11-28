@@ -43,12 +43,20 @@ const slugParam = z
   .max(100)
   .regex(/^[a-z0-9][a-z0-9_-]*$/, "must be a lowercase slug");
 
+/**
+ * The 2014 core rules: the SRD, Open5e's 5e core reference lists, and the owner's three books
+ * (PHB, Monster Manual, DMG). The "Core rules" filter narrows a list to these documents.
+ */
+export const CORE_RULES_DOCUMENT_KEYS = ["srd-2014", "core", "phb-2014", "mm-2014", "dmg-2014"] as const;
+
 /** Search and paging, shared by every list endpoint. */
 export const ListQueryBase = z.object({
   /** Case-insensitive match on the name. */
   q: z.string().trim().min(1).max(100).optional(),
   /** Only records from this source document. */
   document: DocumentKey.optional(),
+  /** Only records from the core rules documents (`CORE_RULES_DOCUMENT_KEYS`). Narrows; ANDed with `document`. */
+  core: boolParam.optional(),
   page: intParam(1, 100_000).default(1),
   pageSize: intParam(1, MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });

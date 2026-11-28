@@ -14,8 +14,9 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (input: string) => {
       urls.push(String(input));
+      const counts = { spells: 3, monsters: 0, classes: 0, conditions: 0, species: 0, backgrounds: 0, feats: 0, weapons: 0, armor: 0, magic_items: 0, roll_tables: 0, rule_sections: 0, rule_chapters: 0, rules: 0, items: 0, item_sets: 0, reference_entries: 0 };
       const body = String(input).startsWith("/api/rules/documents")
-        ? { items: [{ ...SRD_DOCUMENT, counts: { spells: 3, monsters: 0, classes: 0, conditions: 0, species: 0, backgrounds: 0, feats: 0, weapons: 0, armor: 0, magic_items: 0, roll_tables: 0, rule_sections: 0 } }] }
+        ? { items: [{ ...SRD_DOCUMENT, counts }, { ...SRD_DOCUMENT, key: "tob", displayName: "Tome of Beasts", counts }] }
         : {
             items: [
               { id: "srd_fireball", documentKey: "srd-2014", name: "Fireball", level: 3, school: "evocation", classes: ["sorcerer", "wizard"], concentration: false, ritual: false, castingTime: "action", range: "150 feet" },
@@ -61,11 +62,63 @@ describe("spell list filters and the query string", () => {
     await waitFor(() => expect(spellCalls().some((u) => u.includes("level=3") && u.includes("class=wizard"))).toBe(true));
   });
 
-  it("sets the document filter from the SRD-only toggle", async () => {
+  it("writes core=true from the Core rules toggle, and removes it when unticked", async () => {
     const loc = renderAt("/spells");
     await screen.findByText("Fireball");
-    fireEvent.click(screen.getByLabelText("SRD only"));
-    await waitFor(() => expect(loc.history.at(-1)).toBe("/spells?document=srd-2014"));
+    fireEvent.click(screen.getByLabelText("Core rules"));
+    await waitFor(() => expect(loc.history.at(-1)).toBe("/spells?core=true"));
+    await waitFor(() => expect(spellCalls().some((u) => u.includes("core=true"))).toBe(true));
+    fireEvent.click(screen.getByLabelText("Core rules"));
+    await waitFor(() => expect(loc.history.at(-1)).toBe("/spells"));
+  });
+
+  it("clears a non-core document when Core rules is ticked, but keeps a core one", async () => {
+    const loc = renderAt("/spells?document=tob");
+    await screen.findByText("Fireball");
+    fireEvent.click(screen.getByLabelText("Core rules"));
+    await waitFor(() => expect(loc.history.at(-1)).toBe("/spells?core=true"));
+    cleanup();
+    const loc2 = renderAt("/spells?document=srd-2014");
+    await screen.findByText("Fireball");
+    fireEvent.click(screen.getByLabelText("Core rules"));
+    await waitFor(() => expect(loc2.history.at(-1)).toMatch(/document=srd-2014/));
+    expect(loc2.history.at(-1)).toMatch(/core=true/);
+  });
+
+  it("hides non-core sources while Core rules is on, and lets a non-core source be chosen when it is off", async () => {
+    renderAt("/spells?core=true");
+    await screen.findByText("Fireball");
+    await screen.findByRole("option", { name: /5e 2014 Rules/ });
+    expect(screen.queryByRole("option", { name: /Tome of Beasts/ })).toBeNull();
+    cleanup();
+    const loc = renderAt("/spells");
+    await screen.findByText("Fireball");
+    await screen.findByRole("option", { name: /Tome of Beasts/ });
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "tob" } });
+    await waitFor(() => expect(loc.history.at(-1)).toBe("/spells?document=tob"));
+  });
+
+  it("can leave a conflicting core=true and non-core document URL by changing the source, which keeps core", async () => {
+    const loc = renderAt("/spells?core=true&document=tob");
+    await screen.findByText("Fireball");
+    await screen.findByRole("option", { name: /Tome of Beasts/ });
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "srd-2014" } });
+    await waitFor(() => expect(loc.history.at(-1)).toMatch(/document=srd-2014/));
+    expect(loc.history.at(-1)).toMatch(/core=true/);
+  });
+
+  it("still honours old ?document=srd-2014 links", async () => {
+    renderAt("/spells?document=srd-2014");
+    await screen.findByText("Fireball");
+    expect(spellCalls()[0]).toContain("document=srd-2014");
+    expect(spellCalls()[0]).not.toContain("core=");
+  });
+
+  it("keeps a non-core source selected when the URL also has core=true", async () => {
+    renderAt("/spells?core=true&document=tob");
+    await screen.findByText("Fireball");
+    await screen.findByRole("option", { name: /Tome of Beasts/ });
+    expect((screen.getByLabelText("Source") as HTMLSelectElement).value).toBe("tob");
   });
 
   it("debounces the search box into the q parameter", async () => {

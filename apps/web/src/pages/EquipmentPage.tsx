@@ -1,7 +1,7 @@
 import { WEAPON_ARMOR_CATEGORIES } from "@table-forge/shared";
 import { Link } from "wouter";
 import { listArmor, listItems, listItemSets, listWeapons } from "../api/rules.js";
-import { Check, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
+import { coreParam, Check, Filters, SearchBox, Select, SourceFilter, SRD_KEY } from "../components/FilterBar.js";
 import { Results } from "../components/Results.js";
 import { Async } from "../components/States.js";
 import { capitalise, costLabel, keyOptions, titleKey, weaponDamageLabel, weightLabel } from "../format.js";
@@ -23,12 +23,12 @@ export function equipmentTab(params: URLSearchParams): EquipmentTab {
 export const GEAR_CATEGORIES = ["adventuring-gear", "ammunition", "tools", "trade-good", "poison", "land-vehicle", "waterborne-vehicle", "wand", "rod", "staff", "ring"];
 export function weaponApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { q: get("q"), category: get("category"), kind: get("kind"), damageType: get("damageType"), document: get("document"), page: get("page"), pageSize: 40 };
+  return { q: get("q"), category: get("category"), kind: get("kind"), damageType: get("damageType"), document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 40 };
 }
 
 export function armorApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { q: get("q"), category: get("category"), document: get("document"), page: get("page"), pageSize: 40 };
+  return { q: get("q"), category: get("category"), document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 40 };
 }
 
 /**
@@ -37,12 +37,12 @@ export function armorApiParams(params: URLSearchParams) {
  */
 export function gearApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { q: get("q"), category: get("category"), gear: params.get("all") === "1" ? undefined : "true", document: get("document"), page: get("page"), pageSize: 40 };
+  return { q: get("q"), category: get("category"), gear: params.get("all") === "1" ? undefined : "true", document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 40 };
 }
 
 export function packApiParams(params: URLSearchParams) {
   const get = (k: string) => params.get(k) ?? undefined;
-  return { q: get("q"), document: get("document"), page: get("page"), pageSize: 40 };
+  return { q: get("q"), document: get("document"), core: coreParam(params) ? "true" : undefined, page: get("page"), pageSize: 40 };
 }
 
 function Tabs({ tab }: { tab: EquipmentTab }) {
@@ -76,7 +76,7 @@ function WeaponsList() {
         <Select label="Category" value={params.get("category") ?? ""} options={keyOptions(["simple", "martial"])} onChange={(category) => update({ category })} />
         <Select label="Kind" value={params.get("kind") ?? ""} options={keyOptions(["melee", "ranged"])} onChange={(kind) => update({ kind })} />
         <Select label="Damage type" value={params.get("damageType") ?? ""} options={keyOptions(DAMAGE_TYPES)} onChange={(damageType) => update({ damageType })} />
-        <SourceFilter kind="weapons" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="weapons" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (
@@ -116,7 +116,7 @@ function ArmorList() {
       <Filters>
         <SearchBox label="Search armor by name" value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
         <Select label="Category" value={params.get("category") ?? ""} options={keyOptions(["light", "medium", "heavy", "shield"])} onChange={(category) => update({ category })} />
-        <SourceFilter kind="armor" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="armor" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (
@@ -163,7 +163,7 @@ function GearList() {
           onChange={(category) => update({ category })}
         />
         <Check label="Include weapons and armor" checked={all} onChange={(on) => update({ all: on ? "1" : undefined, category: undefined })} />
-        <SourceFilter kind="items" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="items" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (
@@ -202,7 +202,7 @@ function PacksList() {
     <>
       <Filters>
         <SearchBox label="Search packs and sets by name" value={params.get("q") ?? ""} onCommit={(q) => update({ q })} />
-        <SourceFilter kind="item_sets" value={params.get("document") ?? ""} update={update} />
+        <SourceFilter kind="item_sets" value={params.get("document") ?? ""} core={coreParam(params)} update={update} />
       </Filters>
       <Async state={state}>
         {(data) => (
