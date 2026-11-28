@@ -41,9 +41,10 @@ export const SRD_DOCUMENT_KEY = "srd-2014";
  * records (`SRD_DOCUMENT_KEY`) in the listed tables. No per-record links and no name matching.
  *
  * Each book/table is switched on only once that part of the book is fully transcribed, otherwise SRD content
- * would vanish for owners before the book version exists. `phb-2014` and `dmg-2014` are deliberately absent.
+ * would vanish for owners before the book version exists. `dmg-2014` is deliberately absent, and `phb-2014` covers spells only: its feats, backgrounds, races and subclasses are not transcribed yet.
  * The worker's masking clause (apps/worker/src/rules/db.ts) is the only reader of this map.
  */
 export const BOOK_REPLACES_SRD: Readonly<Record<string, readonly RuleTable[]>> = {
   "mm-2014": ["monsters"],
+  "phb-2014": ["spells"],
 };
